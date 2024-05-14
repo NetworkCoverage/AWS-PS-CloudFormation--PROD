@@ -1,0 +1,425 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "VPC Parameters"
+                    },
+                    "Parameters": [
+                        "Region1",
+                        "VPC1Cidr",
+                        "VPC1Subnet1Cidr",
+                        "VPC1Subnet2Cidr",
+                        "Region2",
+                        "VPC2Cidr",
+                        "VPC2Subnet1Cidr",
+                        "VPC2Subnet2Cidr"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "S3 Parameters"
+                    },
+                    "Parameters": [
+                        "S3Bucket",
+                        "S3Key"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "VPN Parameters"
+                    },
+                    "Parameters": [
+                        "CustomerGatewayIpAddress",
+                        "VpnDestinationCidr"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "Region1": {
+                    "default": "Region 1"
+                },
+                "VPC1Cidr": {
+                    "default": "VPC 1 Cidr"
+                },
+                "VPC1Subnet1Cidr": {
+                    "default": "Subnet 1 Cidr"
+                },
+                "VPC1Subnet2Cidr": {
+                    "default":"Subnet 2 Cidr"
+                },
+                "Region2": {
+                    "default": "Region 2"
+                },
+                "VPC2Cidr": {
+                    "default": "VPC 2 Cidr"
+                },
+                "VPC2Subnet1Cidr": {
+                    "default": "Subnet 1 Cidr"
+                },
+                "VPC2Subnet2Cidr": {
+                    "default":"Subnet 2 Cidr"
+                },
+                "S3Bucket": {
+                    "default":"S3 Bucket"
+                },
+                "S3Key": {
+                    "default":"S3 Key"
+                },
+                "CustomerGatewayIpAddress": {
+                    "default":"Customer Gateway Ip Address"
+                },
+                "VpnDestinationCidr": {
+                    "default": "Vpn Destination Cidr"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "Region1": {
+            "Description": "Region where first VPC will be deployed",
+            "Type": "String",
+            "AllowedValues" : ["us-east-1", "us-east-2"]
+        },
+        "VPC1Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC in the first region",
+            "Type": "String"
+        },
+        "VPC1Subnet1Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for subnet 1 in VPC 1",
+            "Type": "String"
+        },
+        "VPC1Subnet2Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for subnet 2 in VPC 1",
+            "Type": "String"
+        },
+        "Region2": {
+            "Description": "Region where second VPC will be deployed",
+            "Type": "String",
+            "AllowedValues" : ["us-west-1", "us-west-2"]
+        },
+        "VPC2Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC in the second region",
+            "Type": "String"
+        },
+        "VPC2Subnet1Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for subnet 1 in VPC 2",
+            "Type": "String"
+        },
+        "VPC2Subnet2Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for subnet 2 in VPC 2",
+            "Type": "String"
+        },
+        "S3Bucket": {
+            "Description": "The name of the bucket that contains your packaged source",
+            "Type": "String"
+        },
+        "S3Key": {
+            "Description": "The name of the ZIP package",
+            "Type": "String"
+        },
+        "CustomerGatewayIpAddress": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+            "ConstraintDescription": "IP Address parameter must be in the form x.x.x.x",
+            "Description": "IP address of the customer's gateway",
+            "Type": "String"
+        },
+        "VpnDestinationCidr": {
+            "Description": "Cidr block(s) of the network(s) destination end of the VPN connection. If there are multiple entries separate them with a comma (for example 10.0.0.0/24, 172.16.0.0/24).",
+            "Type": "CommaDelimitedList"
+        }
+    },
+    "Conditions": {
+        "NVirginiaRegionCondition": {
+            "Fn::Equals": [{"Ref": "AWS::Region"}, "us-east-1"]
+        },
+        "USEastCondtion": {
+            "Fn::Or" : [
+                {"Fn::Equals": [{"Ref": "AWS::Region"}, "us-east-1"]},
+                {"Fn::Equals": [{"Ref": "AWS::Region"}, "us-east-2"]}
+             ]
+        }
+    },
+    "Resources": {
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Fn::If": [
+                        "USEastCondtion",
+                        {"Ref": "VPC1Cidr"},
+                        {"Ref": "VPC2Cidr"}
+                    ]
+                },
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {"Key": "Name", "Value":"VPC"},
+                    {"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}
+                ]
+            }
+        },
+		"InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {"Key": "Network", "Value": "Public"},
+					{"Key": "Name", "Value":"Internet Gateway"}
+                ]
+            }
+        },
+        "VPCGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "Subnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone" : {
+                    "Fn::Select" : [0, {"Fn::GetAZs" : "" }]
+                },
+                "CidrBlock": {
+                    "Fn::If": [
+                        "USEastCondtion",
+                        {"Ref": "VPC1Subnet1Cidr"},
+                        {"Ref": "VPC2Subnet1Cidr"}
+                    ]
+                },
+				"MapPublicIpOnLaunch": true,
+                "Tags": [
+                    {"Key": "Network", "Value": "Public"},
+					{"Key": "Name", "Value": "Subnet 1"}
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            }
+        },
+		"Subnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone" : {
+                    "Fn::Select" : [1, {"Fn::GetAZs" : "" }]
+                },
+                "CidrBlock": {
+                    "Fn::If": [
+                        "USEastCondtion",
+                        {"Ref": "VPC1Subnet2Cidr"},
+                        {"Ref": "VPC2Subnet2Cidr"}
+                    ]
+                },
+				"MapPublicIpOnLaunch": true,
+                "Tags": [
+                    {"Key": "Network", "Value": "Public"},
+					{"Key": "Name", "Value": "Subnet 2"}
+                ],
+                "VpcId": {
+                    "Ref": "VPC"
+                }
+            }
+        },
+        "TransitGateway": {
+            "Type": "AWS::EC2::TransitGateway",
+            "Properties": {
+                "AutoAcceptSharedAttachments": "enable",
+                "DefaultRouteTablePropagation": "disable",
+                "Description":"Transit Gateway",
+                "Tags": [
+                    {"Key": "Name", "Value": "Transit Gateway"}
+                ]
+            }
+        },
+        "CustomerGateway": {
+            "Type": "AWS::EC2::CustomerGateway",
+            "Properties": {
+                "BgpAsn": 65000,
+                "DeviceName": "Customer Firewall",
+                "IpAddress": {"Ref": "CustomerGatewayIpAddress"},
+                "Tags": [ 
+                    {"Key": "Name", "Value": "Customer Gateway"}
+                ],
+                "Type": "ipsec.1"
+              }
+        },
+        "VPNConnection": {
+            "Type": "AWS::EC2::VPNConnection",
+            "Properties": {
+                "CustomerGatewayId": {"Ref": "CustomerGateway"},
+                "StaticRoutesOnly": true,
+                "Tags": [ 
+                    {"Key": "Name", "Value": "VPN Connection"}
+                ],
+                "TransitGatewayId": {"Ref": "TransitGateway"},
+                "Type": "ipsec.1"
+              }
+        },
+        "VPCDefaultSecurityGroupIngress": {
+            "Type" : "AWS::EC2::SecurityGroupIngress",
+            "Properties" : {
+              "GroupId": {"Fn::GetAtt" : ["VPC", "DefaultSecurityGroup"] },
+              "IpProtocol":"-1",
+              "CidrIp":"0.0.0.0/0"
+            }
+        },
+        "LambdaExecutionRole": {
+			"Type": "AWS::IAM::Role",
+		    "Condition": "USEastCondtion",
+            "Properties": {
+		    	"AssumeRolePolicyDocument": {
+			    	"Version": "2012-10-17",
+		        	"Statement": [
+                        {
+		      	  			"Effect": "Allow",
+    		        		"Principal": {
+								"Service": [
+									"lambda.amazonaws.com"
+								]
+                            },
+							"Action": [
+                                "sts:AssumeRole"
+                            ]
+		    		    }
+                    ]
+		    	},
+		    	"Path": "/",
+		    	"Policies": [
+                    {
+						"PolicyName": "AWSPowerShellLambdaExecutionRolePolicy",
+						"PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:DeleteTransitGatewayPeeringAttachment",
+                                        "ec2:DeleteTransitGatewayVpcAttachment",
+                                        "ec2:DescribeInternetGateways",
+                                        "ec2:DescribeRouteTables",
+                                        "ec2:DescribeTransitGatewayAttachments",
+                                        "ec2:DescribeTransitGatewayPeeringAttachments",
+                                        "ec2:DescribeTransitGatewayRouteTables",
+                                        "ec2:DescribeTransitGateways",
+                                        "ec2:DescribeTransitGatewayVpcAttachments",
+                                        "ec2:DescribeSubnets",
+                                        "ec2:DescribeVpcs",
+                                        "ec2:AcceptTransitGatewayPeeringAttachment",
+                                        "ec2:CreateRoute",
+                                        "ec2:CreateTransitGatewayPeeringAttachment",
+                                        "ec2:CreateTransitGatewayRoute",
+                                        "ec2:CreateTransitGatewayVpcAttachment",
+                                        "ec2:EnableTransitGatewayRouteTablePropagation",
+                                        "ec2:DeleteTags",
+                                        "ec2:CreateTags",
+                                        "iam:ListRoles",
+                                        "iam:CreateServiceLinkedRole",
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+									"Effect": "Allow",
+									"Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+									"Resource": "arn:aws:logs:*:*:*"
+								}
+                            ]
+                        }
+					}
+                ]
+			}
+		},
+        "VpcHelperFunction": {
+            "Type" : "AWS::Lambda::Function",
+            "Condition": "USEastCondtion",
+            "DependsOn": "TransitGateway",
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket": { "Ref": "S3Bucket" },
+                    "S3Key": { "Ref": "S3Key" }
+                },
+                "Description" : "This function ccreates the peering and vpc transit gateway attachments",
+
+                "Handler" : "vpc-stackset-helper::vpc_stackset_helper.Bootstrap::ExecuteFunction",
+                "MemorySize" : 512,
+                "Role" : {"Fn::GetAtt" : ["LambdaExecutionRole", "Arn"]},
+                "Runtime" : "dotnet6",
+                "Timeout" : 900
+            }
+        },
+        "InvokeVpcHelperFunction": {
+            "Type": "Custom::InvokeVpcHelperFunction",
+            "Condition": "USEastCondtion",
+            "DependsOn": "VpcHelperFunction",
+            "Properties": {
+                "ServiceToken": {"Fn::GetAtt" : ["VpcHelperFunction", "Arn"]},
+                "AccountID" : {"Ref": "AWS::AccountId"}, 
+                "AcceptorRegion" : {"Ref": "Region2"}, 
+                "RequestorRegion": {"Ref": "Region1"},
+                "VpnDestinationCidr": {"Ref": "VpnDestinationCidr"},
+                "Vpc1SubnetCidr": {"Fn::Join": [",", [{"Ref": "VPC1Subnet1Cidr"},{"Ref": "VPC1Subnet2Cidr"}]]},
+                "Vpc2SubnetCidr": {"Fn::Join": [",", [{"Ref": "VPC2Subnet1Cidr"},{"Ref": "VPC2Subnet2Cidr"}]]}
+            }
+        } 
+    },
+    "Outputs": {
+        "Subnet1Id": {
+            "Description": "Subent 1 ID",
+            "Value": {"Ref": "Subnet1"},
+            "Export" : {"Name" : "VPC-StackSet-Subnet1ID"}
+        },
+        "Subnet2Id": {
+            "Description": "Subent 1 ID",
+            "Value": {"Ref": "Subnet2"},
+            "Export" : {"Name" : "VPC-StackSet-Subnet2ID"}
+        },
+        "VPCId": {
+            "Description": "VPC ID",
+            "Value": {"Ref": "VPC"},
+            "Export" : {"Name" : "VPC-StackSet-VPCID"}
+        },
+        "TransitGatewayId": {
+            "Description": "Transit Gateway ID",
+            "Value": {"Ref": "TransitGateway"},
+            "Export" : {"Name" : "VPC-StackSet-TransitGatewayID"}
+        },
+        "Region1": {
+            "Description": "Region 1",
+            "Value": {"Ref": "Region1"},
+            "Export" : {"Name" : "VPC-StackSet-Region1"}
+        },
+        "Region2": {
+            "Description": "Region 2",
+            "Value": {"Ref": "Region2"},
+            "Export" : {"Name" : "VPC-StackSet-Region2"}
+        },
+        "DefaultSecurityGroupId":{
+            "Description": "Default Security Group Id",
+            "Value" :  {"Fn::GetAtt" : ["VPC", "DefaultSecurityGroup"]},
+            "Export": {"Name": "VPC-StackSet-DefaultSecurityGroupId"}
+        } 
+    }
+}

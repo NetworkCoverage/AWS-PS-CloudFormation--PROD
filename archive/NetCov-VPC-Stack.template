@@ -1,0 +1,552 @@
+{
+"AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {"default": "Customer Parameters"},
+                    "Parameters": [
+                        "CustomerAbbreviation"
+                    ]
+                },
+                {
+                    "Label": {"default": "VPC Parameters"},
+                    "Parameters": [
+                        "VpcCidr",
+                        "Subnet1Cidr",
+                        "Subnet2Cidr"
+                    ]
+                },
+                {
+                    "Label": {"default": "S3 Parameters"},
+                    "Parameters": [
+                        "S3Bucket",
+                        "HelperS3Key",
+                        "NamingS3Key"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "VPN Parameters"
+                    },
+                    "Parameters": [
+                        "CreateTransitGateway",
+                        "CustomerGatewayIpAddress",
+                        "VpnDestinationCidr"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "CustomerAbbreviation": {
+                    "default":"Customer Abbreviation"
+                },
+                "CustomerGatewayIpAddress": {
+                    "default":"Customer Gateway IP Address"
+                },
+                "CreateTransitGateway": {
+                    "default":"Enable Transit Gateway"
+                },
+                "HelperS3Key": {
+                    "default":"S3 Key"
+                },
+                "NamingS3Key": {
+                    "default":"S3 Key"
+                },
+                "S3Bucket": {
+                    "default":"S3 Bucket"
+                },
+                "Subnet1Cidr": {
+                    "default": "Subnet 1 Cidr"
+                },
+                "Subnet2Cidr": {
+                    "default":"Subnet 2 Cidr"
+                },
+                "VpcCidr": {
+                    "default": "VPC 1 Cidr"
+                },
+                "VpnDestinationCidr": {
+                    "default":"VPN Destination Cidr"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "CustomerAbbreviation": {
+            "AllowedPattern": "^[a-z]{2,}$",
+            "ConstraintDescription": "Customer abbreviation must have a miniumum of 2 characters",
+            "Description": "Customer abbreviation",
+            "Type": "String"
+        },
+        "CustomerGatewayIpAddress": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+            "ConstraintDescription": "IP Address parameter must be in the form x.x.x.x",
+            "Description": "IP address of the customer's gateway",
+            "Type": "String"
+        },
+        "CreateTransitGateway": {
+            "AllowedValues" : ["true", "false"],
+            "Default": "false",
+            "Description": "Enter true/false if this CloudFormation template will deploy a transit gateway",
+            "Type": "String"
+        },
+        "HelperS3Key": {
+            "Default": "multiaz-vpchelper.zip",
+            "Description": "The name of the ZIP package of the helper funciton",
+            "Type": "String"
+        },
+        "NamingS3Key": {
+            "Default": "multiaz-vpcnaming.zip",
+            "Description": "The name of the ZIP package of the naming funciton",
+            "Type": "String"
+        },
+        "S3Bucket": {
+            "Description": "The name of the bucket that contains your packaged source",
+            "Type": "String"
+        },
+        "Subnet1Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC subnet 1",
+            "Type": "String"
+        },
+        "Subnet2Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC subnet 1",
+            "Type": "String"
+        },
+        "VpcCidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC",
+            "Type": "String"
+        },
+        "VpnDestinationCidr": {
+            "Description": "Cidr block(s) of the network(s) destination end of the VPN connection. If there are multiple entries separate them with a comma (for example 10.0.0.0/24, 172.16.0.0/24).",
+            "Type": "CommaDelimitedList"
+        }
+    },
+    "Conditions": {
+        "CreateTransitGateway": {
+            "Fn::Equals": [{"Ref": "CreateTransitGateway"}, "true"]
+        },
+        "CreateVpnGateway": {
+            "Fn::Equals": [{"Ref": "CreateTransitGateway"}, "false"]
+        }
+    },
+    "Resources": {     
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {"Ref": "VpcCidr"},
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}
+                ]
+            }
+        },        
+        "Subnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select" : [0, {"Fn::GetAZs" : "" }]
+                },
+                "CidrBlock": {"Ref":"Subnet1Cidr"},
+                "MapPublicIpOnLaunch" : "true",
+                "VpcId": {"Ref": "VPC"},
+                "Tags": [
+                    {"Key": "Network", "Value": "Public"},
+                    {"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}
+                ]
+            }
+        },        
+        "Subnet2": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "AvailabilityZone": {
+                    "Fn::Select" : [1, {"Fn::GetAZs" : ""}]
+                },
+                "CidrBlock": {"Ref":"Subnet2Cidr"},
+                "MapPublicIpOnLaunch" : "true",
+                "VpcId": {"Ref": "VPC"},
+                "Tags": [
+                    {"Key": "Network", "Value": "Public"},
+                    {"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}
+                ]
+            }
+        },       
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+            }
+        },
+        "InternetGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {"Ref": "VPC"},
+                "InternetGatewayId": {"Ref": "InternetGateway"}
+            }
+        },        
+        "RouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {"Ref":"VPC"},
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+            }
+        },
+        "Subnet1RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {"Ref": "RouteTable"},
+                "SubnetId": {"Ref": "Subnet1"}
+            }
+        },
+        "Subnet2RouteTableAssociation": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "RouteTableId": {"Ref": "RouteTable"},
+                "SubnetId": {"Ref": "Subnet2"}
+            }
+        },
+        "DefaultRoute": {
+            "Type": "AWS::EC2::Route",
+            "DependsOn": "InternetGatewayAttachment",
+            "Properties": {
+                "RouteTableId": {"Ref":"RouteTable"},
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {"Ref":"InternetGateway"}
+            }
+        },
+        "TransitGateway": {
+            "Condition": "CreateTransitGateway",
+            "Type": "AWS::EC2::TransitGateway",
+            "Properties": {
+                "AutoAcceptSharedAttachments": "enable",
+                "Description":"Transit Gateway",
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+            }
+        },
+        "TransitGatewayAttachment": {
+            "Condition": "CreateTransitGateway",
+            "DependsOn": "TransitGateway",
+            "Type" : "AWS::EC2::TransitGatewayAttachment",
+            "Properties" : {
+                "SubnetIds" : [ {"Ref": "Subnet1"}, {"Ref": "Subnet2"}],
+                "Tags" : [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}],
+                "TransitGatewayId" : {"Ref": "TransitGateway"},
+                "VpcId" : {"Ref": "VPC"}
+            }
+        },
+       "VpnGateway": {
+            "Condition": "CreateVpnGateway",
+            "Type" : "AWS::EC2::VPNGateway",
+            "Properties" : {
+                "Tags" : [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}],
+                "Type" : "ipsec.1"
+            }
+        },
+        "CustomerGateway": {
+            "Type": "AWS::EC2::CustomerGateway",
+            "Properties": {
+                "BgpAsn": 65000,
+                "DeviceName": "Customer Firewall",
+                "IpAddress": {"Ref": "CustomerGatewayIpAddress"},
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}],
+                "Type": "ipsec.1"
+            }
+        },
+        "VpnGatewayAttachment": {
+            "Condition": "CreateVpnGateway",
+            "Type" : "AWS::EC2::VPCGatewayAttachment",
+            "Properties" : {
+                "VpcId" : {"Ref": "VPC"},
+                "VpnGatewayId" : {"Ref": "VpnGateway"}
+            }
+        },
+        "VpnConnection": {
+            "Type": "AWS::EC2::VPNConnection",
+            "Properties": {
+                "CustomerGatewayId": {"Ref": "CustomerGateway"},
+                "StaticRoutesOnly": true,
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}],
+                "TransitGatewayId": {
+                    "Fn::If":[
+                        "CreateTransitGateway",
+                        {"Ref": "TransitGateway"},
+                        {"Ref": "AWS::NoValue"}
+                    ]
+                },
+                "Type": "ipsec.1",
+                "VpnGatewayId" : {
+                    "Fn::If":[
+                        "CreateVpnGateway",
+                        {"Ref": "VpnGateway"},
+                        {"Ref": "AWS::NoValue"}
+                    ]
+                }
+            }
+        },
+        "VpnRoutePropagation": {
+            "Condition": "CreateVpnGateway",
+            "DependsOn": ["VpnConnection","VpnGatewayAttachment"],
+            "Type": "AWS::EC2::VPNGatewayRoutePropagation",
+            "Properties": {
+                "RouteTableIds": [
+                    {"Ref": "RouteTable"}
+                ],
+                "VpnGatewayId": {"Ref": "VpnGateway"}
+            }
+        },
+        "HelperLambdaExecutionRole": {
+			"Type": "AWS::IAM::Role",
+		    "Properties": {
+		    	"AssumeRolePolicyDocument": {
+			    	"Version": "2012-10-17",
+		        	"Statement": [
+                        {
+		      	  			"Effect": "Allow",
+    		        		"Principal": {
+								"Service": [
+									"lambda.amazonaws.com"
+								]
+                            },
+							"Action": [
+                                "sts:AssumeRole"
+                            ]
+		    		    }
+                    ]
+		    	},
+		    	"Path": "/",
+		    	"Policies": [
+                    {
+						"PolicyName": "HelperLambdaExecutionRolePolicy",
+						"PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:CreateRoute",
+                                        "ec2:CreateTransitGatewayRoute",
+                                        "ec2:CreateVpnConnectionRoute",
+                                        "ec2:DeleteRouteTable",
+                                        "ec2:DescribeInternetGateways",
+                                        "ec2:DescribeRouteTables",
+                                        "ec2:DescribeSecurityGroups",
+                                        "ec2:DescribeSecurityGroupRules",
+                                        "ec2:DescribeTransitGateway",
+                                        "ec2:DescribeTransitGatewayAttachments",
+                                        "ec2:DescribeTransitGatewayRouteTables",
+                                        "ec2:ReplaceRouteTableAssociation",
+                                        "ec2:RevokeSecurityGroupEgress",
+                                        "ec2:RevokeSecurityGroupIngress",
+                                        "iam:ListRoles",
+                                        "iam:CreateServiceLinkedRole",
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+									"Effect": "Allow",
+									"Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+									"Resource": "arn:aws:logs:*:*:*"
+								}
+                            ]
+                        }
+					}
+                ]
+			}
+		},
+        "VpcHelperFunction": {
+            "Type" : "AWS::Lambda::Function",
+            "DependsOn": "VpnConnection",
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket": {"Ref": "S3Bucket"},
+                    "S3Key": {"Ref": "HelperS3Key"}
+                },
+                "Description" : "This function creates the underlying network routes and attachments",
+                "Handler" : "multiaz-vpchelper::multiaz_vpchelper.Bootstrap::ExecuteFunction",
+                "MemorySize" : 512,
+                "Role" : {"Fn::GetAtt" : ["HelperLambdaExecutionRole", "Arn"]},
+                "Runtime" : "dotnet8",
+                "Timeout" : 900
+            }
+        },
+        "InvokeVpcHelperFunction": {
+            "Type": "Custom::InvokeVpcHelperFunction",
+            "DependsOn": "VpcHelperFunction",
+            "Properties": {
+                "AccountID" : {"Ref": "AWS::AccountId"}, 
+                "Region" : {"Ref": "AWS::Region"},
+                "ServiceToken": {"Fn::GetAtt" : ["VpcHelperFunction", "Arn"]},
+                "RouteTable": {"Ref": "RouteTable"},
+                "TransitGateway": {
+                    "Fn::If":[
+                        "CreateTransitGateway",
+                        {"Ref": "TransitGateway"},
+                        {"Ref": "AWS::NoValue"}
+                    ]
+                },
+                "TransitGatewayAttachment": {
+                    "Fn::If":[
+                        "CreateTransitGateway",
+                        {"Ref": "TransitGatewayAttachment"},
+                        {"Ref": "AWS::NoValue"}
+                    ]
+                },
+                "VpnGateway": {
+                    "Fn::If":[
+                        "CreateVpnGateway",
+                        {"Ref": "VpnGateway"},
+                        {"Ref": "AWS::NoValue"}
+                    ]                    
+                },
+                "Vpc": {"Ref": "VPC"},
+                "VpnConnection": {"Ref": "VpnConnection"},
+                "VpnDestinationCidr": {"Ref": "VpnDestinationCidr"},
+                "VpcId": {"Ref": "VPC"}
+            }
+        },
+        "NamingLambdaExecutionRole": {
+			"Type": "AWS::IAM::Role",
+		    "Properties": {
+		    	"AssumeRolePolicyDocument": {
+			    	"Version": "2012-10-17",
+		        	"Statement": [
+                        {
+		      	  			"Effect": "Allow",
+    		        		"Principal": {
+								"Service": [
+									"lambda.amazonaws.com"
+								]
+                            },
+							"Action": [
+                                "sts:AssumeRole"
+                            ]
+		    		    }
+                    ]
+		    	},
+		    	"Path": "/",
+		    	"Policies": [
+                    {
+						"PolicyName": "NamingFunctionLambdaExecutionRolePolicy",
+						"PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:CreateTags",
+                                        "ec2:DescribeSecurityGroups",
+                                        "ec2:DescribeTransitGatewayAttachments",
+                                        "ec2:DescribeTransitGatewayRouteTables",
+                                        "iam:ListRoles",
+                                        "iam:CreateServiceLinkedRole",
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+									"Effect": "Allow",
+									"Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+									"Resource": "arn:aws:logs:*:*:*"
+								}
+                            ]
+                        }
+					}
+                ],
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+			}
+		},
+        "VpcNamingFunction": {
+            "Type" : "AWS::Lambda::Function",
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket": {"Ref": "S3Bucket" },
+                    "S3Key": {"Ref": "NamingS3Key" }
+                },
+                "Description" : "This function generates the name tag for all the resources",
+
+                "Handler" : "multiaz-vpcnaming::multiaz_vpcnaming.Bootstrap::ExecuteFunction",
+                "MemorySize" : 512,
+                "Role" : {"Fn::GetAtt" : ["NamingLambdaExecutionRole", "Arn"]},
+                "Runtime" : "dotnet8",
+                "Timeout" : 900,
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+            }
+        },
+        "InvokeVpcNamingFunction": {
+            "Type": "Custom::InvokeVpcNamingFunction",
+            "DependsOn": ["VPC","Subnet1","Subnet2","VpcNamingFunction", "InternetGateway", "RouteTable", "NamingLambdaExecutionRole", "VpnConnection","InvokeVpcHelperFunction"],
+            "Properties": {
+                "AvailabilityZone1": {"Fn::Select" : [0, {"Fn::GetAZs" : "" }]},
+                "AvailabilityZone2": {"Fn::Select" : [1, {"Fn::GetAZs" : "" }]},
+                "CustomerAbbreviation": {"Ref": "CustomerAbbreviation"},
+                "CustomerGateway": {"Ref": "CustomerGateway"},
+                "InternetGateway": {"Ref": "InternetGateway"},
+                "ServiceToken": {"Fn::GetAtt" : ["VpcNamingFunction", "Arn"]},
+                "Region": {"Ref": "AWS::Region"},
+                "RouteTable": {"Ref":"RouteTable"},
+                "Subnet1": {"Ref": "Subnet1"},
+                "Subnet2": {"Ref": "Subnet2"},
+                "TransitGateway": {
+                    "Fn::If":[
+                        "CreateTransitGateway",
+                        {"Ref": "TransitGateway"},
+                        {"Ref": "AWS::NoValue"}
+                    ]
+                },
+                "TransitGatewayAttachment": {
+                    "Fn::If":[
+                        "CreateTransitGateway",
+                        {"Ref": "TransitGatewayAttachment"},
+                        {"Ref": "AWS::NoValue"}
+                    ]
+                },
+                "Vpc": {"Ref": "VPC"},
+                "VpnConnection": {"Ref": "VpnConnection"},
+                "VpnGateway": {
+                    "Fn::If":[
+                        "CreateVpnGateway",
+                        {"Ref": "VpnGateway"},
+                        {"Ref": "AWS::NoValue"}
+                    ]                    
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "VpcId": {
+            "Description": "The ID of the new VPC",
+            "Value": {"Ref": "VPC"}
+        },
+        "Subnet1Id": {
+            "Description": "The ID of the subnet in the first availbiity zone",
+            "Value": {"Ref": "Subnet1"}
+        },
+        "Subnet2Id": {
+            "Description": "The ID of the subnet in the second availbiity zone",
+            "Value": {"Ref": "Subnet2"}
+        },
+        "NamingFunctionRole": {
+            "Description": "The ARN of the role created for the Naming Lambda function",
+            "Value": {"Fn::GetAtt" : ["NamingLambdaExecutionRole", "Arn"]}
+        },
+        "HelperLambdaExecutionRole": {
+            "Description": "The ARN of the role created for the Helper Lambda function",
+            "Value": {"Fn::GetAtt" : ["HelperLambdaExecutionRole", "Arn"]}
+        }
+    }
+}

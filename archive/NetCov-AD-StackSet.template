@@ -1,0 +1,413 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Instance Parameters"
+                    },
+                    "Parameters": [
+                        "InstanceType",
+                        "LatestAmiId",
+                        "LocalAdminPassword",
+                        "LocalAdminUsername",
+                        "Server1Name",
+                        "Server1IP",
+                        "Server2Name",
+                        "Server2IP"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Active Directory Parameters"
+                    },
+                    "Parameters": [
+                        "ADServer1Ip",
+                        "ADServer2Ip",
+                        "DomainAdminPassword",
+                        "DomainAdminUserName",
+                        "DomainFQDN",
+                        "DomainNetBIOS"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "InstanceType": {
+                    "default": "Instance Type"
+                },
+                "LatestAmiId": {
+                    "default": "Ami Id"
+                },
+                "LocalAdminPassword": {
+                    "default": "Local Admin Password"
+                },
+                "LocalAdminUsername": {
+                    "default": "Local Admin Username"
+                },
+                "Server1Name": {
+                    "default": "Server 1 Name"
+                },
+                "Server1IP": {
+                    "default": "Server 1 Ip"
+                },
+                "Server2Name": {
+                    "default": "Server 2 Name"
+                },
+                "Server2IP": {
+                    "default": "Server 2 Ip"
+                },
+                "ADServer1Ip": {
+                    "default": "AD Server 1 Ip"
+                },
+                "ADServer2Ip": {
+                    "default": "AD Server 2 Ip"
+                },
+                "DomainAdminPassword": {
+                    "default": "Domain Admin Password"
+                },
+                "DomainAdminUserName": {
+                    "default": "Domain Admin User Name"
+                },
+                "DomainFQDN": {
+                    "default": "Fully Qualified Domain Name"
+                },
+                "DomainNetBIOS": {
+                    "default": "Domain NetBIOS Name"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "ADServer1Ip": {
+            "Description": "IP address of the primary Active Directory server",
+            "Type": "String"
+        },
+        "ADServer2Ip": {
+            "Description": "IP address of the secondary Active Directory server",
+            "Type": "String",
+            "Default": ""
+        },
+        "DomainAdminPassword": {
+            "Description": "The password of the AD account username provided",
+            "Type": "String"
+        },
+        "DomainAdminUserName": {
+            "Description": "The username of an AD account with admin privileges",
+            "Type": "String"
+        },
+        "DomainFQDN": {
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+",
+            "Description": "Fully qualified domain name (FQDN) of the forest root domain",
+            "MaxLength": "25",
+            "MinLength": "3",
+            "Type": "String"
+        },
+        "DomainNetBIOS": {
+            "AllowedPattern": "[a-zA-Z0-9]+",
+            "Description": "NetBIOS name of the domain (up to 15 characters)",
+            "MaxLength": "15",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "InstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t3a.large",
+            "AllowedValues": [
+                "t3a.large",
+                "t3a.xlarge",
+                "t3a.2xlarge"
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "LatestAmiId": {
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+            "Description": "System Manager parameter value for latest Windows Server AMI",
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+        },
+        "LocalAdminPassword": {
+            "Description": "A password for the local admin account",
+            "Type": "String"
+        },
+        "LocalAdminUsername": {
+            "Description": "A username for a local admin account",
+            "Default": "nctech",
+            "Type": "String"
+        },
+        "Server1Name": {
+            "Description": "Name of the first Active Directory server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "Server1IP": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+            "Description": "Static IP to assign to the first Active Directory server",
+            "Type": "String"
+        },
+        "Server2Name": {
+            "Description": "Name of the second Active Directory server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "Server2IP": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+            "Description": "Static IP to assign to the second Active Directory server",
+            "Type": "String"
+        }
+    },
+    "Conditions": {
+        "USEastCondtion": {
+            "Fn::Or": [
+                {"Fn::Equals": [{"Ref": "AWS::Region"},"us-east-1"]},
+                {"Fn::Equals": [{"Ref": "AWS::Region"},"us-east-2"]}
+            ]
+        },
+        "IsADServer2IpEmpty": {
+            "Fn::Equals": [
+                {"Ref": "ADServer2Ip"},
+                ""
+             ]
+        }
+    },
+    "Resources": {
+        "DHCPOptions": {
+            "Type": "AWS::EC2::DHCPOptions",
+            "Properties": {
+                "DomainName": {"Ref": "DomainFQDN"},
+                "DomainNameServers": [
+                    {"Ref": "ADServer1Ip"},
+                    {"Ref": "ADServer2Ip"}
+                ],
+                "NtpServers": [
+                    {"Ref": "ADServer1Ip"}
+                ],
+                "NetbiosNameServers": [
+                    {"Ref": "ADServer1Ip"},
+                    {"Ref": "ADServer2Ip"}
+                ],
+                "NetbiosNodeType": "2",
+                "Tags": [{"Key": "Name","Value": "DHCP Options"}]
+            }
+        },
+        "DHCPOptionsAssociation": {
+            "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+            "Properties": {
+                "VpcId": {
+                    "Fn::ImportValue": "VPC-StackSet-VPCID"
+                },
+                "DhcpOptionsId": {
+                    "Ref": "DHCPOptions"
+                }
+            }
+        },
+        "KeyPair": {
+            "Type": "AWS::EC2::KeyPair",
+            "Properties": {
+                "KeyName": {
+                    "Fn::Join": [
+                        "-",
+                        [
+                            "ec2-keypair",
+                            {
+                                "Ref": "AWS::Region"
+                            }
+                        ]
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "Key Pair"
+                    }
+                ]
+            }
+        },
+        "DomainController": {
+            "Type": "AWS::EC2::Instance",
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "config": {
+                        "files": {
+                            "c:\\cfn\\cfn-hup.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[main]\n",
+                                            "stack=", {"Ref" : "AWS::StackId"}, "\n",
+                                            "region=", {"Ref" : "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[cfn-auto-reloader-hook]\n",
+                                            "triggers=post.update\n",
+                                            "path=Resources.DomainController.Metadata.AWS::CloudFormation::Init\n",
+                                            "action=cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r DomainController", " --region ", {"Ref" : "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            }
+                        },
+                        "commands": {
+                            "a-set-static-ip": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command \"",
+                                            "$netip = Get-NetIPConfiguration; ",
+                                            "$ipconfig = Get-NetIPAddress | ?{$_.IpAddress -eq $netip.IPv4Address.IpAddress}; ",
+                                            "Get-NetAdapter | Set-NetIPInterface -DHCP Disabled; ",
+                                            "Get-NetAdapter | New-NetIPAddress -AddressFamily IPv4 -IPAddress $netip.IPv4Address.IpAddress -PrefixLength $ipconfig.PrefixLength -DefaultGateway $netip.IPv4DefaultGateway.NextHop; ",
+                                            "Get-NetAdapter | Set-DnsClientServerAddress -ServerAddresses $netip.DNSServer.ServerAddresses;\"\n"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "b-join-domain": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Add-Computer -DomainName ",
+                                            {"Ref": "DomainFQDN"},
+                                            " -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOS"},
+                                            "\\",
+                                            {"Ref": "DomainAdminUserName"},
+                                            "', (ConvertTo-SecureString -String ",
+                                            {"Ref": "DomainAdminPassword"},
+                                            " -AsPlainText -Force))) -NewName ",
+                                            {
+                                                "Fn::If": [
+                                                    "USEastCondtion",
+                                                    {"Ref": "Server1Name"},
+                                                    {"Ref": "Server2Name"}
+                                                ]
+                                            },
+                                            " -Force"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "c-rename-local-admin": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUsername"}]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "d-reset-local-admin-pw": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUsername"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "e-restart-computer": {
+                                "command": "powershell.exe -command Restart-Computer",
+                                "waitAfterCompletion": "forever"
+                            },
+                            "f-signal-success" : { 
+                                "command" : { "Fn::Join" : ["", ["cfn-signal.exe -e 0 \"", { "Fn::Base64" : { "Ref": "DomainControllerWaitHandle" } },"\"" ]]}
+                            }
+                        },
+                        "services": {
+                            "windows": {
+                                "cfn-hup": {
+                                    "enabled": "true",
+                                    "ensureRunning": "true",
+                                    "files": [
+                                        "c:\\cfn\\cfn-hup.conf",
+                                        "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "ImageId": {"Ref": "LatestAmiId"},
+                "InstanceType": {"Ref": "InstanceType"},
+                "KeyName": {"Ref": "KeyPair"},
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "USEastCondtion",
+                        {"Ref": "Server1IP"},
+                        {"Ref": "Server2IP"}
+                    ]
+                },
+                "SubnetId": {"Fn::ImportValue": "VPC-StackSet-Subnet1ID"},
+                "Tags": {
+                    "Fn::If": [
+                        "USEastCondtion",
+                        [{"Key": "Name", "Value": {"Ref": "Server1Name"}}],
+                        [{"Key": "Name", "Value": {"Ref": "Server2Name"}}]
+                    ]
+                }, 
+                "UserData": { 
+                    "Fn::Base64" : { 
+                        "Fn::Join" : [
+                            "", 
+                            [
+                                "<script>\n",                  
+                                "cfn-init.exe -v -s ", {"Ref" : "AWS::StackId" }, " -r DomainController ", " --region ", { "Ref" : "AWS::Region" }, "\n",        
+                                "</script>"          
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "DomainControllerWaitCondition": {
+            "Type": "AWS::CloudFormation::WaitCondition",
+            "DependsOn": "DomainController",
+            "Properties": {
+                "Handle": {"Ref": "DomainControllerWaitHandle"},
+                "Timeout": "3600"
+            }
+        },
+        "DomainControllerWaitHandle": {
+            "Type": "AWS::CloudFormation::WaitConditionHandle"
+        }
+    },
+    "Outputs": {
+        "KeyPairName": {
+            "Description": "Name of the keypair",
+            "Value": {"Ref": "KeyPair"},
+            "Export" : {"Name" : "AD-StackSet-KeyPairName"}
+        },
+        "DomainFQDN": {
+            "Description": "Fully qualified name of the Active Direcory domain",
+            "Value": {"Ref": "DomainFQDN"},
+            "Export" : {"Name" : "AD-StackSet-DomainFQDN"}
+        },
+        "DomainNetBIOS": {
+            "Description": "NetBIOS name of the Active Direcory domain",
+            "Value": {"Ref": "DomainNetBIOS"},
+            "Export" : {"Name" : "AD-StackSet-DomainNetBIOS"}
+        },
+        "DomainAdminUserName": {
+            "Value": {"Ref": "DomainAdminUserName"},
+            "Export" : {"Name" : "AD-StackSet-DomainAdminUserName"}
+        },
+        "DomainAdminPassword": {
+            "Value": {"Ref": "DomainAdminPassword"},
+            "Export" : {"Name" : "AD-StackSet-DomainAdminPassword"}
+        },
+        "LocalAdminUsername": {
+            "Value": {"Ref": "LocalAdminUsername"},
+            "Export" : {"Name" : "AD-StackSet-LocalAdminUsername"}
+        },
+        "LocalAdminPassword": {
+            "Value": {"Ref": "LocalAdminPassword"},
+            "Export" : {"Name" : "AD-StackSet-LocalAdminPassword"}
+        }
+    }
+}

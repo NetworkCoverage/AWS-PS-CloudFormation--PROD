@@ -1,0 +1,239 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Transform": [
+        "Count"
+    ],
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "General Parameters"
+                    },
+                    "Parameters": [
+                        "LatestAmiId"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Session Host Parameters"
+                    },
+                    "Parameters": [
+                        "AdditionalSessionHostNames",
+                        "SessionHostInstanceType"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "AdditionalSessionHostNames": {
+                    "default": "Additional Session Host Names"
+                },
+                "LatestAmiId": {
+                    "default": "AMI ID"
+                },
+                "SessionHostInstanceType": {
+                    "default": "Session Host Instance Type"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "AdditionalSessionHostNames": {
+            "Description": "Comma separated list of session host names",
+            "Type": "String"
+        },
+        "LatestAmiId": {
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+            "Description": "System Manager parameter value for latest Windows Server AMI",
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+        },
+        "SessionHostInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "r6i.large",
+            "AllowedValues": [
+                "r6i.large",
+                "r6i.2xlarge",
+                "r6i.4xlarge" 
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        }
+    },
+    "Resources": {
+        "Instance": {
+            "Type" : "AWS::EC2::Instance",
+            "Metadata" : {
+                "AWS::CloudFormation::Init" : {
+                    "config" : {
+                        "files": {
+                            "c:\\cfn\\cfn-hup.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[main]\n",
+                                            "stack=", {"Ref" : "AWS::StackId"}, "\n",
+                                            "region=", {"Ref" : "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[cfn-auto-reloader-hook]\n",
+                                            "triggers=post.update\n",
+                                            "path=Resources.Instance%d.Metadata.AWS::CloudFormation::Init\n",
+                                            "action=cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r Instance%d", " --region ", {"Ref" : "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            }
+                        },
+                        "commands" : {
+                            "a-set-static-ip": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command \"",
+                                            "$netip = Get-NetIPConfiguration; ",
+                                            "$ipconfig = Get-NetIPAddress | ?{$_.IpAddress -eq $netip.IPv4Address.IpAddress}; ",
+                                            "Get-NetAdapter | Set-NetIPInterface -DHCP Disabled; ",
+                                            "Get-NetAdapter | New-NetIPAddress -AddressFamily IPv4 -IPAddress $netip.IPv4Address.IpAddress -PrefixLength $ipconfig.PrefixLength -DefaultGateway $netip.IPv4DefaultGateway.NextHop; ",
+                                            "Get-NetAdapter | Set-DnsClientServerAddress -ServerAddresses $netip.DNSServer.ServerAddresses;\"\n"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "b-join-domain": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command $List = '",
+                                            {"Ref": "AdditionalSessionHostNames"},
+                                            "'; $Name = $List.Split(',')[%d - 1]; Add-Computer -DomainName ",
+                                            {"Fn::ImportValue": "AD-StackSet-DomainFQDN"},
+                                            " -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Fn::ImportValue": "AD-StackSet-DomainNetBIOS"},
+                                            "\\",
+                                            {"Fn::ImportValue": "AD-StackSet-DomainAdminUserName"},
+                                            "', (ConvertTo-SecureString -String ",
+                                            {"Fn::ImportValue": "AD-StackSet-DomainAdminPassword"},
+                                            " -AsPlainText -Force))) -NewName $Name -Force"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "c-remove-windows-defender": {
+                                "command": "powershell.exe -command Remove-WindowsFeature -Name Windows-Defender",
+                                "waitAfterCompletion": "60"
+                            },
+                            "d-enable-remotefx": {
+                                "command": "powershell.exe -command New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services' -Name 'fEnableRemoteFXAdvancedRemoteApp' -Value 0 -PropertyType DWORD -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "e-turn-off-uac": {
+                                "command": "powershell.exe -command Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name 'ConsentPromptBehaviorAdmin' -Value 0",
+                                "waitAfterCompletion": "0"
+                            },
+                            "f-turn-off-windows-firewall": {
+                                "command": "powershell.exe -command Set-NetFirewallProfile -All -Enabled False",
+                                "waitAfterCompletion": "0"
+                            },
+                            "g-enable-powershell-remoting": {
+                                "command": "powershell.exe -command Enable-PSRemoting",
+                                "waitAfterCompletion": "0"
+                            },
+                            "h-enable-credssp-server": {
+                                "command": "powershell.exe -command Enable-WSManCredSSP -Role Server -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "i-rename-local-admin": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Fn::ImportValue": "AD-StackSet-LocalAdminUsername"}]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "j-reset-local-admin-pw": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Fn::ImportValue": "AD-StackSet-LocalAdminUsername"}, " -Password (ConvertTo-SecureString -String '", {"Fn::ImportValue": "AD-StackSet-LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "k-restart-computer": {
+                                "command": "powershell.exe -command Restart-Computer",
+                                "waitAfterCompletion": "forever"
+                            },
+                            "l-add-rd-session-host": {
+                                "command":{
+                                    "Fn::Join" : [
+                                        "",
+                                        [
+                                            "powershell.exe -command Add-RDServer -Server ('{0}.",
+                                            {"Fn::ImportValue": "AD-StackSet-DomainFQDN"},
+                                            "' -f $env:COMPUTERNAME) -Role 'RDS-RD-SERVER' -ConnectionBroker '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Fn::ImportValue": "AD-StackSet-DomainFQDN"},
+                                            "' -GatewayExternalFqdn '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Fn::ImportValue": "AD-StackSet-DomainFQDN"},
+                                            "'"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "m-signal-success" : { 
+                                "command" : { "Fn::Join" : ["", ["cfn-signal.exe -e 0 \"", {"Fn::Base64": {"Ref": "SessionHostWaitHandle"}},"\""]]}
+                            }
+                        },
+                        "services": {
+                            "windows": {
+                                "cfn-hup": {
+                                    "enabled": "true",
+                                    "ensureRunning": "true",
+                                    "files": [
+                                        "c:\\cfn\\cfn-hup.conf",
+                                        "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Count": 3,
+            "Properties" : {
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {"VolumeSize": "100", "VolumeType": "gp3"}
+                    }
+                ],
+                "ImageId": {"Ref": "LatestAmiId"},
+                "InstanceType": {"Ref": "SessionHostInstanceType"},
+                "KeyName": {"Fn::ImportValue": "AD-StackSet-KeyPairName"},
+                "SubnetId": {"Fn::ImportValue": "VPC-StackSet-Subnet1ID"},
+                "Tags": [
+                    {"Key": "Role", "Value": "AdditionalSessionHost"},
+                    {"Key": "map-migrated", "Value": "d-server-03jpm34ivsp1f1"}                    
+                ], 
+                "UserData": { 
+                    "Fn::Base64" : { 
+                        "Fn::Join" : [
+                            "", 
+                            [
+                                "<script>\n",                  
+                                "cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r Instance%d ", " --region ", {"Ref" : "AWS::Region"}, "\n",        
+                                "</script>"          
+                            ]
+                        ]
+                    }
+                }
+            }
+        } 
+    }
+}

@@ -1,0 +1,66 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {},
+    "Parameters": {},
+    "Conditions": {
+        "SingleSessionHostCondition": {            
+            "Fn::Equals" : [
+                {"Ref" : "SessionHostNumberOfInstances"},
+                1
+            ]            
+        },
+        "MultipleSessionHostCondition": {
+            "Fn::Not" : [{
+               "Fn::Equals" : [
+                  {"Ref" : "SessionHostNumberOfInstances"},
+                  1
+            ]   
+            }]
+        }
+    },
+    "Resources": {
+        "SingleSessionHostStack": {
+            "Condition": "SingleSessionHostCondition",
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Capabilities": ["CAPABILITY_IAM"],
+                "Description": "",
+                "DisableRollback": "true",
+                "Parameters": {},
+                "StackName": { "Fn::Join" : [ "", [{"Ref": "AWS::StackName"},"-rds"]]},
+                "Tags": [{"Key": "map-migrated", "Value": "d-server-03jpm34ivsp1f1"}],              
+                "TemplateURL": "https://netcov-set-devtest1-internal-us-east-2.s3.us-east-2.amazonaws.com/NetCov-RDS-BK-SH-GW-SSL-Stack-v2.template"
+            }
+        },
+        "CountMacroStack": {
+            "Condition": "MultipleSessionHostCondition",
+            "Type" : "AWS::CloudFormation::Stack",
+            "Properties" : {
+                "Capabilities": ["CAPABILITY_IAM"],
+                "Description": "Deploys the count iterator macro",
+                "DisableRollback": "true",
+                "StackName": { "Fn::Join" : [ "", [{"Ref": "AWS::StackName"},"-count"]]},
+                "Tags": [{"Key": "map-migrated", "Value": "d-server-03jpm34ivsp1f1"}],              
+                "TemplateURL": "https://netcov-set-devtest1-internal-us-east-2.s3.us-east-2.amazonaws.com/NetCov-Count-Stack.yaml"
+            }
+        },
+        "MultipleSessionHostStack": {
+            "Condition": "MultipleSessionHostCondition",
+            "DependsOn": "CountMacroStack",
+            "Type" : "AWS::CloudFormation::Stack",
+            "Properties" : {
+                "Capabilities": ["CAPABILITY_IAM"],
+                "Description": "",
+                "DisableRollback": "true",
+                "Parameters": {},
+                "StackName": { "Fn::Join" : [ "", [{"Ref": "AWS::StackName"},"-rds"]]},
+                "Tags": [{"Key": "map-migrated", "Value": "d-server-03jpm34ivsp1f1"}],              
+                "TemplateURL": "https://netcov-set-devtest1-internal-us-east-2.s3.us-east-2.amazonaws.com/NetCov-RDS-BK-MultiSH-GW-SSL-Stack.template"
+            }
+        }
+    },
+    "Outputs": {
+
+    }
+}

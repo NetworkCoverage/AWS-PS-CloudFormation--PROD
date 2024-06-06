@@ -134,8 +134,23 @@ try {
              
             $TransitGatewayRouteTable = Get-EC2TransitGatewayRouteTable -Filter @{Name = 'transit-gateway-id'; Values = $TransitGateway} -Region $Region
             $TransitGatewayRouteTableName = '{0}-{1}-tgw01-rt01' -f $CustomerAbbreviation, $RegionCode
-            Write-Host ('Applying name tag {0} to transit gateway route table {0}' -f $TransitGatewayRouteTableName, ($TransitGatewayRouteTable | ConvertTo-Json -Depth 3))
+            Write-Host ('Applying name tag {0} to transit gateway route table {1}' -f $TransitGatewayRouteTableName, ($TransitGatewayRouteTable | ConvertTo-Json -Depth 3))
             New-EC2Tag -Resource $TransitGatewayRouteTable.TransitGatewayRouteTableId -Tag @{Key = 'Name' ; Value = $TransitGatewayRouteTableName} -Region $Region
+            
+            # Network Interface for Transit Gateway Attachments
+            # Get-EC2NetworkInterface -Filter @{Name = 'interface-type'; Values = 'transit_gateway'} -Region us-west-2
+            $NetworkInterface = Get-EC2NetworkInterface -Filter @(@{Name = 'vpc-id'; Values = $VpcId}, @{Name = 'interface-type'; Values = 'transit_gateway'}) -Region $Region
+            
+            for ($i = 0; $i -lt $NetworkInterface.Count; $i++) {
+                $Subnet = Get-EC2Subnet -Filter @{Name = 'subnet-id'; Values = $NetworkInterface[$i].SubnetId} -Region $Region
+                $SubnetName = $Subnet.Tags | Where-Object {$_.Key -eq 'Name'} | Select-Object -ExpandProperty Value
+                $NetworkInterfaceName = '{0}-{1}-{2}-{3}-tgw01-eni{4:D2}' -f $CustomerAbbreviation, $SubnetName.Split('-')[1], $SubnetName.Split('-')[3], $SubnetName.Split('-')[4], ($i + 1)
+                
+                Write-Host ('Applying map-migrated tag to transit gateway network interface {0}' -f $NetworkInterface[$i].NetworkInterfaceId)
+                New-EC2Tag -Resource $NetworkInterface[$i].NetworkInterfaceId -Tag @{Key = "map-migrated"; Value ="d-server-03jpm34ivsp1f1"} -Region $Region
+                Write-Host ('Applying name tag {0} to transit gateway network interface {1}' -f $NetworkInterfaceName, $NetworkInterface[$i].NetworkInterfaceId)
+                New-EC2Tag -Resource $NetworkInterface[$i].NetworkInterfaceId -Tag @{Key = 'Name' ; Value = $NetworkInterfaceName} -Region $Region
+            }
         }
 
         if ($VpnGateway) {
@@ -151,17 +166,19 @@ try {
 
         $DefaultSecurityGroup = Get-EC2SecurityGroup -Filter @(@{Name = 'vpc-id'; Values = $VpcId}, @{Name = 'group-name'; Values = 'default'}) -Region $Region
         $SecurityGroupName = '{0}-{1}-vpc01-default-sg' -f $CustomerAbbreviation, $RegionCode
-        Write-Host ("Attempting to tag the vpc {0} default security group: {1}" -f ($DefaultSecurityGroup | ConvertTo-Json -Depth 3), $VpcId)
+        Write-Host ("Applying name tag {0} to the vpc default security group {1}" -f $SecurityGroupName, $DefaultSecurityGroup.GroupId)
         New-EC2Tag -Resource $DefaultSecurityGroup.GroupId -Tag @{Key = 'Name' ; Value = $SecurityGroupName} -Region $Region
 
         # Security group name tag
         $SecurityGroupName = '{0}-{1}-vpc01-sg01' -f $CustomerAbbreviation, $RegionCode
+        Write-Host ("Applying name tag {0} to tag the access security group {1}" -f $SecurityGroupName, $SecurityGroup)
         New-EC2Tag -Resource $SecurityGroup -Tag @{Key = 'Name' ; Value = $SecurityGroupName} -Region $Region
         
         # DHCP option set
         $DefaultDhcpOption = Get-EC2DhcpOption -DhcpOptionsId (Get-EC2Vpc -VpcId $VpcId -Region $Region).DhcpOptionsId -Region $Region
         $DhcpOptionName = '{0}-{1}-vpc01-default-dos' -f $CustomerAbbreviation, $RegionCode
-        New-EC2Tag -Resource $DefaultDhcpOption.DhcpOptionsId -Tag @{Key = 'Name' ; Value = $DhcpOptionName} -Region $Region
+        Write-Host ("Applying name tag {0} to tag the default dhcp option set {1}" -f $DhcpOptionName, $DefaultDhcpOption.DhcpOptionsId)
+        New-EC2Tag -Resource $DefaultDhcpOption.DhcpOptionsId -Tag @{Key = 'Name' ; Value = $DhcpOptionName} -Region $Region        
 
         Signal-AWSCloudFormation -SignalType SUCCESS
     }

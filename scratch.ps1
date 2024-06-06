@@ -55,7 +55,7 @@ $Subnet1Cidr = '10.1.0.0/24'
 $Subnet2Cidr = '10.1.1.0/24'
 $VpcCidr = '10.1.0.0/16'
 $CreateTransitGateway = 'true'
-$CustomerAbbreviation = 'mystack'
+$CustomerAbbreviation = 'test'
 
 $Parameter = @(
     @{ParameterKey = 'CreateTransitGateway'; ParameterValue = $CreateTransitGateway},
@@ -70,7 +70,7 @@ $Parameter = @(
     @{ParameterKey = 'VpnDestinationCidr'; ParameterValue = '192.168.6.0/24'}
 )
 $CFNStack = @{
-    StackName = 'my-stack-vpc'
+    StackName = 'Stack-Test-VPC'
     Capability = 'CAPABILITY_IAM'
     DisableRollback = $true
     Parameter = $Parameter
@@ -80,16 +80,14 @@ $CFNStack = @{
 }
 New-CFNStack @CFNStack
 
-$Region = 'us-west-2'
-$CustomerAbbreviation = 'mystack'
-$SecurityGroupId = 'sg-07125ab6ebb601af3'
+$SecurityGroupId = 'sg-0e0e3a84cdd6b9650'
 $Server1Ip = '10.1.0.5'
-$Server1Name = 'mys-ad01'
+$Server1Name = 'TEST-AD01'
 $Server2Ip = '10.1.1.5'
-$Server2Name = 'mys-ad02'
-$Subnet1Id = 'subnet-0f827214a25498768'
-$Subnet2Id = 'subnet-069c2e825cb45a2bd'
-$VpcId = 'vpc-0bf1a958e5fd24121'
+$Server2Name = 'TEST-AD02'
+$Subnet1Id = 'subnet-07d400d38fb53938f'
+$Subnet2Id = 'subnet-01135417f637e575b'
+$VpcId = 'vpc-0b3971b986c54d177'
 
 $Parameter = @(
     @{ParameterKey = 'ADServer1Ip'; ParameterValue = '192.168.6.5'},
@@ -101,7 +99,7 @@ $Parameter = @(
     @{ParameterKey = 'InstanceType'; ParameterValue = 't3a.large'},
     @{ParameterKey = 'LatestAmiId'; ParameterValue = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base'},
     @{ParameterKey = 'LocalAdminPassword'; ParameterValue = 'darkD!me83'},
-    @{ParameterKey = 'LocalAdminUsername'; ParameterValue = 'nctech'},
+    @{ParameterKey = 'LocalAdminUserName'; ParameterValue = 'nctech'},
     @{ParameterKey = 'SecurityGroupId'; ParameterValue = $SecurityGroupId},
     @{ParameterKey = 'Server1Ip'; ParameterValue = $Server1Ip},
     @{ParameterKey = 'Server1Name'; ParameterValue = $Server1Name},
@@ -114,11 +112,55 @@ $Parameter = @(
     @{ParameterKey = 'VpcId'; ParameterValue = $VpcId}
 )
 $CFNStack = @{
-    StackName = 'my-stack-ad'
+    StackName = 'Stack-Test-AD'
     Capability = 'CAPABILITY_IAM'
     DisableRollback = $true
     Parameter = $Parameter
     TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-AD-Stack.template'
+    Region = $Region
+    ProfileName = 'set-devtest1-internal'
+}
+New-CFNStack @CFNStack 
+
+$KeypairName = '{0}-ec2-keypair-{1}' -f $CustomerAbbreviation, $Region
+$SessionHostNames = 'TEST-RDS01,TEST-RDS02,TEST-RDS03'
+$AllocationId = 'eipalloc-0b6905971005d20b5'
+$BrokerServerName = 'MYS-BK01'
+$GatewayExternalFqdn = 'rds.netcov.com'
+
+$Parameter = @(
+    @{ParameterKey = 'ADServerName'; ParameterValue = 'TEST-DC01'},
+    @{ParameterKey = 'AllocationId'; ParameterValue = $AllocationId},
+    @{ParameterKey = 'BrokerInstanceType'; ParameterValue = 't3a.xlarge'},
+    @{ParameterKey = 'BrokerNamingS3Key'; ParameterValue = 'bk-stack-naming.zip'},
+    @{ParameterKey = 'BrokerServerName'; ParameterValue = $BrokerServerName},
+    @{ParameterKey = 'BrokerSubnetId'; ParameterValue = $Subnet2Id},
+    @{ParameterKey = 'CustomerAbbreviation'; ParameterValue = $CustomerAbbreviation},
+    @{ParameterKey = 'DomainAdminPassword'; ParameterValue = 'f@ncyCar53'},
+    @{ParameterKey = 'DomainAdminUsername'; ParameterValue = 'Administrator'},
+    @{ParameterKey = 'DomainDNSName'; ParameterValue = 'corp.test.com'},
+    @{ParameterKey = 'DomainNetBIOSName'; ParameterValue = 'TEST'},
+    @{ParameterKey = 'GatewayExternalFqdn'; ParameterValue = $GatewayExternalFqdn},
+    @{ParameterKey = 'KeyPairName'; ParameterValue = $KeypairName},
+    @{ParameterKey = 'LatestAmiId'; ParameterValue = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base'},
+    @{ParameterKey = 'LocalAdminPassword'; ParameterValue = 'darkD!me83'},
+    @{ParameterKey = 'LocalAdminUsername'; ParameterValue = 'nctech'},
+    @{ParameterKey = 'S3Bucket'; ParameterValue = ('netcov-set-devtest1-internal-{0}' -f $Region)},
+    @{ParameterKey = 'SecurityGroupId'; ParameterValue = $SecurityGroupId},
+    @{ParameterKey = 'SessionHostInstanceType'; ParameterValue = 'r6i.large'},
+    @{ParameterKey = 'SessionHostNames'; ParameterValue = $SessionHostNames},
+    @{ParameterKey = 'SessionHostNamingS3Key'; ParameterValue = 'sh-stack-naming.zip'},
+    @{ParameterKey = 'SessionHostSubnetId'; ParameterValue = $Subnet1Id},
+    @{ParameterKey = 'VpcId'; ParameterValue = $VpcId},
+    @{ParameterKey = 'WinAcmeS3Key'; ParameterValue = 'win-acme.v2.2.4.1500.x64.pluggable.zip'}
+    
+)
+$CFNStack = @{
+    StackName = 'Stack-Test-RD'
+    Capability = 'CAPABILITY_IAM', 'CAPABILITY_AUTO_EXPAND'
+    DisableRollback = $true
+    Parameter = $Parameter
+    TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-RD-Stack.template' 
     Region = $Region
     ProfileName = 'set-devtest1-internal'
 }
@@ -393,23 +435,307 @@ Remove-CFNStackSet @CFNStackSet -Region 'us-east-1'
 #endregion us-east-1
 
 
-<# 
-https://netcov-set-devtest1-internal-us-east-1.s3.amazonaws.com/NetCov-RDS-BK-SH-GW-SSL-StackSet.template
 
-RDS-GW-SSH-StackSet-Test-MR-v29
+$CFNStack = @{
+    StackName = 's3test'
+    DisableRollback = $true
+    Capability = 'CAPABILITY_IAM'
+    TemplateBody = '{
+        "AWSTemplateFormatVersion": "2010-09-09",
+        "Resources": {
+            "Instance": {
+                "Type" : "AWS::EC2::Instance",
+                "Metadata": {
+                    "AWS::CloudFormation::Init": {
+                        "config": {
+                            "files": {
+                                "c:\\cfn\\cfn-hup.conf": {
+                                    "content": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "[main]\n",
+                                                "stack=", {"Ref" : "AWS::StackId"}, "\n",
+                                                "region=", {"Ref" : "AWS::Region"}, "\n"
+                                            ]
+                                        ]
+                                    }
+                                },
+                                "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf": {
+                                    "content": {
+                                        "Fn::Join": [
+                                            "",
+                                            [
+                                                "[cfn-auto-reloader-hook]\n",
+                                                "triggers=post.update\n",
+                                                "path=Resources.Instance.Metadata.AWS::CloudFormation::Init\n",
+                                                "action=cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r Instance", " --region ", {"Ref" : "AWS::Region"}, "\n"
+                                            ]
+                                        ]
+                                    }
+                                },
+                                c:\\cfn\\test.zip: {
+                                    "source": {
+                                        "Fn::Join": [
+                                            "/",
+                                            [
+                                                "https://s3.amazonaws.com",
+                                                "netcov-set-devtest1-internal-us-east-2",
+                                                "win-acme.v2.2.4.1500.x64.pluggable.zip"
+                                            ]
+                                        ]
+                                    }
+                                },
+                                "c:\\cfn\\win-acme.zip": {
+                                    "source": "https://netcov-set-devtest1-internal-us-east-2.s3.us-east-2.amazonaws.com/win-acme.v2.2.4.1500.x64.pluggable.zip"
+                                }                          
+                            },
+                            "commands": {
+                                "a-signal-success" : { 
+                                    "command" : { "Fn::Join" : ["", ["cfn-signal.exe --stack ", {"Ref" : "AWS::StackId"}, " --resource Instance --region ", {"Ref" : "AWS::Region"}]]}
+                                }
+                            },
+                            "services": {
+                                "windows": {
+                                    "cfn-hup": {
+                                        "enabled": "true",
+                                        "ensureRunning": "true",
+                                        "files": [
+                                            "c:\\cfn\\cfn-hup.conf",
+                                            "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "Properties" : {
+                    "ImageId" : "ami-087fc1aada380df36",
+                    "InstanceType" : "t3a.small",
+                    "KeyName" : "test-kp",
+                    "SecurityGroupIds" : ["sg-004c0d7ef6c4c17e9"],
+                    "SubnetId" : "subnet-0378190d02648f3f8",
+                    "Tags" : [
+                        {"Key": "Name", "Value": "S3TEST"}                    
+                    ], 
+                    "UserData": { 
+                        "Fn::Base64" : { 
+                            "Fn::Join" : [
+                                "", 
+                                [
+                                    "<script>\n",                  
+                                    "cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r Instance --region ", {"Ref" : "AWS::Region"}, "\n",
+                                    "</script>"       
+                                ]
+                            ]
+                        }
+                    }
+                },
+                "CreationPolicy" : {
+                    "ResourceSignal" : {
+                        "Timeout" : "PT10M"
+                    }
+                }
+            }          
+        }
+    }'
+    Region = 'us-east-2'
+    ProfileName = 'set-devtest1-internal'
+}
+New-CFNStack @CFNStack
 
 
-ADServerName	TEST-DC01'},
-AllocationId	eipalloc-0eb6baa8ad1f91121'},
-BrokerInstanceType	t3a.large'},
-BrokerIp	10.55.0.11'},
-BrokerServerName	TEST-GW25'},
-GatewayExternalFqdn	rds2.netcov.com'},
-LatestAmiId	/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base	ami-0ab05a04b66a879af
-S3Bucket	netcov-set-devtest1-internal-us-east-1'},
-S3Key	win-acme.v2.2.4.1500.x64.pluggable.zip'},
-SessionHostInstanceType	r6i.large'},
-SessionHostServerName	TEST-SH25'},
-SessionIp	10.55.0.10
 
-#>
+$AllocationId = 'eipalloc-0b6905971005d20b5'
+$BrokerServerName = 'MYS-BK01'
+$CreateTransitGateway = 'false'
+$CustomerAbbreviation = 'test'
+$GatewayExternalFqdn = 'rds.netcov.com'
+$Region = 'us-west-2'
+$SessionHostNames = 'TEST-RDS01,TEST-RDS02,TEST-RDS03'
+$Server1Ip = '10.1.0.5'
+$Server1Name = 'TEST-AD01'
+$Server2Ip = '10.1.1.5'
+$Server2Name = 'TEST-AD02'
+$Subnet1Cidr = '10.1.0.0/24'
+$Subnet2Cidr = '10.1.1.0/24'
+$VpcCidr = '10.1.0.0/16'
+
+$Parameter = @(
+    @{ParameterKey = 'AdInstanceType'; ParameterValue = 't3a.large'},
+    @{ParameterKey = 'AdNamingS3Key'; ParameterValue = 'ad-stack-naming.zip'},
+    @{ParameterKey = 'ADServer1Ip'; ParameterValue = '192.168.6.5'},
+    @{ParameterKey = 'ADServer2Ip'; ParameterValue = ''},
+    @{ParameterKey = 'ADServerName'; ParameterValue = 'TEST-DC01'},
+    @{ParameterKey = 'AllocationId'; ParameterValue = $AllocationId},
+    @{ParameterKey = 'BrokerInstanceType'; ParameterValue = 't3a.xlarge'},
+    @{ParameterKey = 'BrokerNamingS3Key'; ParameterValue = 'bk-stack-naming.zip'},
+    @{ParameterKey = 'BrokerServerName'; ParameterValue = $BrokerServerName},
+    @{ParameterKey = 'CustomerAbbreviation'; ParameterValue = $CustomerAbbreviation},
+    @{ParameterKey = 'CustomerGatewayIpAddress'; ParameterValue = '38.122.194.242'},
+    @{ParameterKey = 'CreateTransitGateway'; ParameterValue = $CreateTransitGateway},
+    @{ParameterKey = 'DomainAdminPassword'; ParameterValue = 'f@ncyCar53'},
+    @{ParameterKey = 'DomainAdminUserName'; ParameterValue = 'Administrator'},
+    @{ParameterKey = 'DomainDNSName'; ParameterValue = 'corp.test.com'},
+    @{ParameterKey = 'DomainNetBIOSName'; ParameterValue = 'TEST'},
+    @{ParameterKey = 'GatewayExternalFqdn'; ParameterValue = $GatewayExternalFqdn},
+    @{ParameterKey = 'LatestAmiId'; ParameterValue = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base'},
+    @{ParameterKey = 'LocalAdminPassword'; ParameterValue = 'darkD!me83'},
+    @{ParameterKey = 'LocalAdminUserName'; ParameterValue = 'nctech'},
+    @{ParameterKey = 'S3Bucket'; ParameterValue = ('netcov-set-devtest1-internal-{0}' -f $Region)},
+    @{ParameterKey = 'Server1Ip'; ParameterValue = $Server1Ip},
+    @{ParameterKey = 'Server1Name'; ParameterValue = $Server1Name},
+    @{ParameterKey = 'Server2Ip'; ParameterValue = $Server2Ip},
+    @{ParameterKey = 'Server2Name'; ParameterValue = $Server2Name},
+    @{ParameterKey = 'SessionHostInstanceType'; ParameterValue = 'r6i.large'},
+    @{ParameterKey = 'SessionHostNames'; ParameterValue = $SessionHostNames},
+    @{ParameterKey = 'SessionHostNamingS3Key'; ParameterValue = 'sh-stack-naming.zip'},
+    @{ParameterKey = 'Subnet1Cidr'; ParameterValue = $Subnet1Cidr},
+    @{ParameterKey = 'Subnet2Cidr'; ParameterValue = $Subnet2Cidr},
+    @{ParameterKey = 'VpcCidr'; ParameterValue = $VpcCidr},
+    @{ParameterKey = 'VpcHelperS3Key'; ParameterValue = 'vpc-stack-helper.zip'},
+    @{ParameterKey = 'VpcNamingS3Key'; ParameterValue = 'vpc-stack-naming.zip'},
+    @{ParameterKey = 'VpnDestinationCidr'; ParameterValue = '192.168.6.0/24'}
+    @{ParameterKey = 'WinAcmeS3Key'; ParameterValue = 'win-acme.v2.2.4.1500.x64.pluggable.zip'}
+)
+$CFNStack = @{
+    StackName = 'Stack-Test'
+    Capability = 'CAPABILITY_IAM', 'CAPABILITY_AUTO_EXPAND'
+    DisableRollback = $true
+    Parameter = $Parameter
+    TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-VPC-AD-RDS-Main-Stack.template' 
+    Region = $Region
+    ProfileName = 'set-devtest1-internal'
+}
+New-CFNStack @CFNStack 
+
+
+
+
+$AllocationId = 'eipalloc-0677ff15ab16e1f5c'
+$BrokerServerName = 'NCI-GW05'
+$CreateTransitGateway = 'true'
+$CustomerAbbreviation = 'nci'
+$GatewayExternalFqdn = 'remote.netcov.com'
+$Region = 'us-east-2'
+$SessionHostNames = 'NCI-RDS10,NCI-RDS11,NCI-TL04'
+$Server1Ip = '10.0.0.5'
+$Server1Name = 'NCI-AD01'
+$Server2Ip = '10.0.1.5'
+$Server2Name = 'NCI-AD02'
+$Subnet1Cidr = '10.0.0.0/24'
+$Subnet2Cidr = '10.0.1.0/24'
+$VpcCidr = '10.0.0.0/16'
+
+$Parameter = @(
+    @{ParameterKey = 'AdInstanceType'; ParameterValue = 't3a.large'},
+    @{ParameterKey = 'AdNamingS3Key'; ParameterValue = 'ad-stack-naming.zip'},
+    @{ParameterKey = 'ADServer1Ip'; ParameterValue = '192.168.6.5'},
+    @{ParameterKey = 'ADServer2Ip'; ParameterValue = ''},
+    @{ParameterKey = 'ADServerName'; ParameterValue = 'TEST-DC01'},
+    @{ParameterKey = 'AllocationId'; ParameterValue = $AllocationId},
+    @{ParameterKey = 'BrokerInstanceType'; ParameterValue = 't3a.xlarge'},
+    @{ParameterKey = 'BrokerNamingS3Key'; ParameterValue = 'bk-stack-naming.zip'},
+    @{ParameterKey = 'BrokerServerName'; ParameterValue = $BrokerServerName},
+    @{ParameterKey = 'CustomerAbbreviation'; ParameterValue = $CustomerAbbreviation},
+    @{ParameterKey = 'CustomerGatewayIpAddress'; ParameterValue = '38.122.194.242'},
+    @{ParameterKey = 'CreateTransitGateway'; ParameterValue = $CreateTransitGateway},
+    @{ParameterKey = 'DomainAdminPassword'; ParameterValue = 'f@ncyCar53'},
+    @{ParameterKey = 'DomainAdminUserName'; ParameterValue = 'Administrator'},
+    @{ParameterKey = 'DomainDNSName'; ParameterValue = 'corp.test.com'},
+    @{ParameterKey = 'DomainNetBIOSName'; ParameterValue = 'TEST'},
+    @{ParameterKey = 'GatewayExternalFqdn'; ParameterValue = $GatewayExternalFqdn},
+    @{ParameterKey = 'LatestAmiId'; ParameterValue = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base'},
+    @{ParameterKey = 'LocalAdminPassword'; ParameterValue = 'darkD!me83'},
+    @{ParameterKey = 'LocalAdminUserName'; ParameterValue = 'nctech'},
+    @{ParameterKey = 'S3Bucket'; ParameterValue = ('netcov-set-devtest1-internal-{0}' -f $Region)},
+    @{ParameterKey = 'Server1Ip'; ParameterValue = $Server1Ip},
+    @{ParameterKey = 'Server1Name'; ParameterValue = $Server1Name},
+    @{ParameterKey = 'Server2Ip'; ParameterValue = $Server2Ip},
+    @{ParameterKey = 'Server2Name'; ParameterValue = $Server2Name},
+    @{ParameterKey = 'SessionHostInstanceType'; ParameterValue = 'r6i.large'},
+    @{ParameterKey = 'SessionHostNames'; ParameterValue = $SessionHostNames},
+    @{ParameterKey = 'SessionHostNamingS3Key'; ParameterValue = 'sh-stack-naming.zip'},
+    @{ParameterKey = 'Subnet1Cidr'; ParameterValue = $Subnet1Cidr},
+    @{ParameterKey = 'Subnet2Cidr'; ParameterValue = $Subnet2Cidr},
+    @{ParameterKey = 'VpcCidr'; ParameterValue = $VpcCidr},
+    @{ParameterKey = 'VpcHelperS3Key'; ParameterValue = 'vpc-stack-helper.zip'},
+    @{ParameterKey = 'VpcNamingS3Key'; ParameterValue = 'vpc-stack-naming.zip'},
+    @{ParameterKey = 'VpnDestinationCidr'; ParameterValue = '192.168.6.0/24'}
+    @{ParameterKey = 'WinAcmeS3Key'; ParameterValue = 'win-acme.v2.2.4.1500.x64.pluggable.zip'}
+)
+$CFNStack = @{
+    StackName = 'Stack-NetCov'
+    Capability = 'CAPABILITY_IAM', 'CAPABILITY_AUTO_EXPAND'
+    DisableRollback = $true
+    Parameter = $Parameter
+    TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-VPC-AD-RDS-Main-Stack.template' 
+    Region = $Region
+    ProfileName = 'set-devtest1-internal'
+}
+New-CFNStack @CFNStack 
+
+
+$AllocationId = 'eipalloc-01b4b0b170f7d457b'
+$BrokerServerName = 'NCI-GW15'
+$CreateTransitGateway = 'false'
+$CustomerAbbreviation = 'nci'
+$GatewayExternalFqdn = 'rdp.netcov.com'
+$Region = 'us-west-1'
+$SessionHostNames = 'NCI-RDS30,NCI-RDS31,NCI-TL34'
+$Server1Ip = '10.44.0.5'
+$Server1Name = 'NCI-AD15'
+$Server2Ip = '10.44.1.5'
+$Server2Name = 'NCI-AD20'
+$Subnet1Cidr = '10.44.0.0/24'
+$Subnet2Cidr = '10.44.1.0/24'
+$VpcCidr = '10.44.0.0/16'
+
+$Parameter = @(
+    @{ParameterKey = 'AdInstanceType'; ParameterValue = 't3a.large'},
+    @{ParameterKey = 'AdNamingS3Key'; ParameterValue = 'ad-stack-naming.zip'},
+    @{ParameterKey = 'ADServer1Ip'; ParameterValue = '192.168.6.5'},
+    @{ParameterKey = 'ADServer2Ip'; ParameterValue = ''},
+    @{ParameterKey = 'ADServerName'; ParameterValue = 'TEST-DC01'},
+    @{ParameterKey = 'AllocationId'; ParameterValue = $AllocationId},
+    @{ParameterKey = 'BrokerInstanceType'; ParameterValue = 't3a.xlarge'},
+    @{ParameterKey = 'BrokerNamingS3Key'; ParameterValue = 'bk-stack-naming.zip'},
+    @{ParameterKey = 'BrokerServerName'; ParameterValue = $BrokerServerName},
+    @{ParameterKey = 'CustomerAbbreviation'; ParameterValue = $CustomerAbbreviation},
+    @{ParameterKey = 'CustomerGatewayIpAddress'; ParameterValue = '38.122.194.242'},
+    @{ParameterKey = 'CreateTransitGateway'; ParameterValue = $CreateTransitGateway},
+    @{ParameterKey = 'DomainAdminPassword'; ParameterValue = 'f@ncyCar53'},
+    @{ParameterKey = 'DomainAdminUserName'; ParameterValue = 'Administrator'},
+    @{ParameterKey = 'DomainDNSName'; ParameterValue = 'corp.test.com'},
+    @{ParameterKey = 'DomainNetBIOSName'; ParameterValue = 'TEST'},
+    @{ParameterKey = 'GatewayExternalFqdn'; ParameterValue = $GatewayExternalFqdn},
+    @{ParameterKey = 'LatestAmiId'; ParameterValue = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base'},
+    @{ParameterKey = 'LocalAdminPassword'; ParameterValue = 'darkD!me83'},
+    @{ParameterKey = 'LocalAdminUserName'; ParameterValue = 'nctech'},
+    @{ParameterKey = 'S3Bucket'; ParameterValue = ('netcov-set-devtest1-internal-{0}' -f $Region)},
+    @{ParameterKey = 'Server1Ip'; ParameterValue = $Server1Ip},
+    @{ParameterKey = 'Server1Name'; ParameterValue = $Server1Name},
+    @{ParameterKey = 'Server2Ip'; ParameterValue = $Server2Ip},
+    @{ParameterKey = 'Server2Name'; ParameterValue = $Server2Name},
+    @{ParameterKey = 'SessionHostInstanceType'; ParameterValue = 'r6i.large'},
+    @{ParameterKey = 'SessionHostNames'; ParameterValue = $SessionHostNames},
+    @{ParameterKey = 'SessionHostNamingS3Key'; ParameterValue = 'sh-stack-naming.zip'},
+    @{ParameterKey = 'Subnet1Cidr'; ParameterValue = $Subnet1Cidr},
+    @{ParameterKey = 'Subnet2Cidr'; ParameterValue = $Subnet2Cidr},
+    @{ParameterKey = 'VpcCidr'; ParameterValue = $VpcCidr},
+    @{ParameterKey = 'VpcHelperS3Key'; ParameterValue = 'vpc-stack-helper.zip'},
+    @{ParameterKey = 'VpcNamingS3Key'; ParameterValue = 'vpc-stack-naming.zip'},
+    @{ParameterKey = 'VpnDestinationCidr'; ParameterValue = '192.168.6.0/24'}
+    @{ParameterKey = 'WinAcmeS3Key'; ParameterValue = 'win-acme.v2.2.9.1701.x64.pluggable.zip'}
+)
+$CFNStack = @{
+    StackName = 'Stack-NetCov'
+    Capability = 'CAPABILITY_IAM', 'CAPABILITY_AUTO_EXPAND'
+    DisableRollback = $true
+    Parameter = $Parameter
+    TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-VPC-AD-RDS-Main-Stack.template' 
+    Region = $Region
+    ProfileName = 'set-devtest1-internal'
+}
+New-CFNStack @CFNStack 

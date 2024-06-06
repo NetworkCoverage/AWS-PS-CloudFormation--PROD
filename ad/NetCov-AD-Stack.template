@@ -1,5 +1,6 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Deploys two instances that will be used as domain controllers. NOTE: The instances are not promoted to domain controllers in this deployment",
     "Metadata": {
         "AWS::CloudFormation::Interface": {
             "ParameterGroups": [
@@ -9,109 +10,43 @@
                 },
                 {
                     "Label": {"default": "Network Parameters"},
-                    "Parameters": [
-                        "VpcId",
-                        "Subnet1Id",
-                        "Subnet2Id",
-                        "SecurityGroupId"
-                    ]
+                    "Parameters": ["VpcId", "Subnet1Id", "Subnet2Id", "SecurityGroupId"]
                 },
                 {
                     "Label": {"default": "Instance Parameters"},
-                    "Parameters": [
-                        "InstanceType",
-                        "LatestAmiId",
-                        "LocalAdminPassword",
-                        "LocalAdminUsername",
-                        "Server1Name",
-                        "Server1Ip",
-                        "Server2Name",
-                        "Server2Ip"
-                    ]
+                    "Parameters": ["InstanceType", "LatestAmiId", "LocalAdminUserName", "LocalAdminPassword",  "Server1Name", "Server1Ip", "Server2Name", "Server2Ip"]
                 },
                 {
                     "Label": {"default": "Active Directory Parameters"},
-                    "Parameters": [
-                        "ADServer1Ip",
-                        "ADServer2Ip",
-                        "DomainAdminPassword",
-                        "DomainAdminUserName",
-                        "DomainDNSName",
-                        "DomainNetBIOSName"
-                    ]
+                    "Parameters": ["ADServer1Ip", "ADServer2Ip", "DomainAdminUserName", "DomainAdminPassword", "DomainDNSName", "DomainNetBIOSName"]
                 },
                 {
                     "Label": {"default": "S3 Parameters"},
-                    "Parameters": [
-                        "S3Bucket",
-                        "S3Key"
-                    ]
+                    "Parameters": ["S3Bucket", "S3Key"]
                 }
             ],
             "ParameterLabels": {
-                "ADServer1Ip": {
-                    "default": "AD Server 1 Ip"
-                },
-                "ADServer2Ip": {
-                    "default": "AD Server 2 Ip"
-                },
-                "CustomerAbbreviation": {
-                    "default": "Customer Abbreviation"
-                },
-                "DomainAdminPassword": {
-                    "default": "Domain Admin Password"
-                },
-                "DomainAdminUserName": {
-                    "default": "Domain Admin User Name"
-                },
-                "DomainDNSName": {
-                    "default": "Fully Qualified Domain Name"
-                },
-                "DomainNetBIOSName": {
-                    "default": "Domain NetBIOS Name"
-                },
-                "InstanceType": {
-                    "default": "Instance Type"
-                },
-                "LatestAmiId": {
-                    "default": "Ami Id"
-                },
-                "LocalAdminPassword": {
-                    "default": "Local Admin Password"
-                },
-                "LocalAdminUsername": {
-                    "default": "Local Admin Username"
-                },
-                "SecurityGroupId": {
-                    "default": "Security Group Id"
-                },
-                "Server1Name": {
-                    "default": "Server 1 Name"
-                },
-                "Server1Ip": {
-                    "default": "Server 1 Ip"
-                },
-                "Server2Name": {
-                    "default": "Server 2 Name"
-                },
-                "Server2Ip": {
-                    "default": "Server 2 Ip"
-                },
-                "Subnet1Id": {
-                    "default": "Subnet 1 Id"
-                },
-                "Subnet2Id": {
-                    "default": "Subnet 2 Id"
-                },
-                "S3Key": {
-                    "default":"S3 Key"
-                },
-                "S3Bucket": {
-                    "default":"S3 Bucket"
-                },
-                "VpcId": {
-                    "default": "Vpc Id"
-                }       
+                "ADServer1Ip": {"default": "AD Server 1 Ip"},
+                "ADServer2Ip": {"default": "AD Server 2 Ip"},
+                "CustomerAbbreviation": {"default": "Customer Abbreviation"},
+                "DomainAdminPassword": {"default": "Domain Admin Password"},
+                "DomainAdminUserName": {"default": "Domain Admin User Name"},
+                "DomainDNSName": {"default": "Fully Qualified Domain Name"},
+                "DomainNetBIOSName": {"default": "Domain NetBIOS Name"},
+                "InstanceType": {"default": "Instance Type"},
+                "LatestAmiId": {"default": "Ami Id"},
+                "LocalAdminPassword": {"default": "Local Admin Password"},
+                "LocalAdminUserName": {"default": "Local Admin Username"},
+                "SecurityGroupId": {"default": "Security Group Id"},
+                "Server1Name": {"default": "Server 1 Name"},
+                "Server1Ip": {"default": "Server 1 Ip"},
+                "Server2Name": {"default": "Server 2 Name"},
+                "Server2Ip": {"default": "Server 2 Ip"},
+                "Subnet1Id": {"default": "Subnet 1 Id"},
+                "Subnet2Id": {"default": "Subnet 2 Id"},
+                "S3Key": {"default":"S3 Key"},
+                "S3Bucket": {"default":"S3 Bucket"},
+                "VpcId": {"default": "Vpc Id"}       
             }
         }
     },
@@ -133,6 +68,7 @@
         },
         "DomainAdminPassword": {
             "Description": "The password of the AD account username provided",
+            "NoEcho": "true",
             "Type": "String"
         },
         "DomainAdminUserName": {
@@ -171,11 +107,28 @@
         },
         "LocalAdminPassword": {
             "Description": "A password for the local admin account",
+            "NoEcho":"true",
             "Type": "String"
         },
-        "LocalAdminUsername": {
+        "LocalAdminUserName": {
             "Description": "A username for a local admin account",
             "Default": "nctech",
+            "Type": "String"
+        },
+        "S3Bucket": {
+            "Default": "netcov-set-devtest1-internal-us-west-1",
+            "Description": "The name of the bucket that contains your packaged source",
+            "Type": "String",
+            "AllowedValues":[
+                "netcov-set-devtest1-internal-us-east-1",
+                "netcov-set-devtest1-internal-us-east-2",
+                "netcov-set-devtest1-internal-us-west-1",
+                "netcov-set-devtest1-internal-us-west-2"
+            ]
+        },
+        "S3Key": {
+            "Default": "ad-stack-naming.zip",
+            "Description": "The name of the ZIP package of the naming funciton",
             "Type": "String"
         },
         "SecurityGroupId": {
@@ -211,16 +164,6 @@
         "Subnet2Id": {
             "Description": "Subnet ID for the second Active Directory server",
             "Type": "AWS::EC2::Subnet::Id"
-        },
-        "S3Key": {
-            "Default": "ad-stack-naming.zip",
-            "Description": "The name of the ZIP package of the naming funciton",
-            "Type": "String"
-        },
-        "S3Bucket": {
-            "Default": "netcov-set-devtest1-internal-us-west-1",
-            "Description": "The name of the bucket that contains your packaged source",
-            "Type": "String"
         },
         "VpcId": {
             "Description": "VPC ID",
@@ -266,7 +209,7 @@
             "Type": "AWS::EC2::KeyPair",
             "Properties": {
                 "KeyName": {
-                    "Fn::Join": ["-", ["ec2-keypair", {"Ref": "AWS::Region"}]]
+                    "Fn::Join": ["-", [{"Ref": "CustomerAbbreviation"},"ec2-keypair", {"Ref": "AWS::Region"}]]
                 },
                 "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
             }
@@ -342,11 +285,11 @@
                                 "waitAfterCompletion": "60"
                             },
                             "c-rename-local-admin": {
-                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUsername"}]]},
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUserName"}]]},
                                 "waitAfterCompletion": "0"
                             },
                             "d-reset-local-admin-pw": {
-                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUsername"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUserName"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
                                 "waitAfterCompletion": "0"
                             },
                             "e-restart-computer": {
@@ -354,7 +297,7 @@
                                 "waitAfterCompletion": "forever"
                             },
                             "f-signal-success" : { 
-                                "command" : { "Fn::Join" : ["", ["cfn-signal.exe -e 0 \"", { "Fn::Base64" : { "Ref": "DomainController1WaitHandle" } },"\"" ]]}
+                                "command" : {"Fn::Join": ["", ["cfn-signal.exe --stack ", {"Ref": "AWS::StackId"}, " --resource DomainController1 --region ", {"Ref": "AWS::Region"}]]}
                             }
                         },
                         "services": {
@@ -407,18 +350,12 @@
                         ]
                     }
                 }
+            },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Timeout": "PT60M"
+                }
             }
-        },
-        "DomainController1WaitCondition": {
-            "Type": "AWS::CloudFormation::WaitCondition",
-            "DependsOn": "DomainController1",
-            "Properties": {
-                "Handle": {"Ref": "DomainController1WaitHandle"},
-                "Timeout": "3600"
-            }
-        },
-        "DomainController1WaitHandle": {
-            "Type": "AWS::CloudFormation::WaitConditionHandle"
         },
         "DomainController2": {
             "Type": "AWS::EC2::Instance",
@@ -491,11 +428,11 @@
                                 "waitAfterCompletion": "60"
                             },
                             "c-rename-local-admin": {
-                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUsername"}]]},
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUserName"}]]},
                                 "waitAfterCompletion": "0"
                             },
                             "d-reset-local-admin-pw": {
-                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUsername"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUserName"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
                                 "waitAfterCompletion": "0"
                             },
                             "e-restart-computer": {
@@ -503,7 +440,7 @@
                                 "waitAfterCompletion": "forever"
                             },
                             "f-signal-success" : { 
-                                "command" : { "Fn::Join" : ["", ["cfn-signal.exe -e 0 \"", { "Fn::Base64" : { "Ref": "DomainController2WaitHandle" } },"\"" ]]}
+                                "command" : {"Fn::Join": ["", ["cfn-signal.exe --stack ", {"Ref": "AWS::StackId"}, " --resource DomainController2 --region ", {"Ref": "AWS::Region"}]]}
                             }
                         },
                         "services": {
@@ -556,18 +493,12 @@
                         ]
                     }
                 }
+            },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Timeout": "PT60M"
+                }
             }
-        },
-        "DomainController2WaitCondition": {
-            "Type": "AWS::CloudFormation::WaitCondition",
-            "DependsOn": "DomainController2",
-            "Properties": {
-                "Handle": {"Ref": "DomainController2WaitHandle"},
-                "Timeout": "3600"
-            }
-        },
-        "DomainController2WaitHandle": {
-            "Type": "AWS::CloudFormation::WaitConditionHandle"
         },
         "NamingLambdaExecutionRole": {
 			"Type": "AWS::IAM::Role",

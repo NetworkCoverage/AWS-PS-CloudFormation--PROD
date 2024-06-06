@@ -1,0 +1,538 @@
+{
+"AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {"default": "Customer Parameters"},
+                    "Parameters": ["CustomerAbbreviation"]
+                },
+                {
+                    "Label": {"default": "VPC Parameters"},
+                    "Parameters": ["VpcCidr", "Subnet1Cidr", "Subnet2Cidr", "CreateTransitGateway"]
+                },
+                {
+                    "Label": {"default": "VPN Parameters"},
+                    "Parameters": ["CustomerGatewayIpAddress", "VpnDestinationCidr"]
+                },
+                {
+                    "Label": {"default": "Active Directory Domain Parameters"},
+                    "Parameters": ["ADServer1Ip", "ADServer2Ip", "ADServerName", "DomainAdminUserName", "DomainAdminPassword", "DomainDNSName", "DomainNetBIOSName"]
+                },
+                {
+                    "Label": {"default": "General Instance Parameters"},
+                    "Parameters": ["LatestAmiId", "LocalAdminUserName", "LocalAdminPassword"]
+                },
+                {
+                    "Label": {"default": "Active Directory Instance Parameters"},
+                    "Parameters": ["AdInstanceType", "Server1Name", "Server1Ip", "Server2Name", "Server2Ip"]
+                },
+                {
+                    "Label": {"default": "Broker Amazon Instance Parameters"},
+                    "Parameters": ["AllocationId", "BrokerInstanceType", "BrokerServerName", "GatewayExternalFqdn"]
+                },
+                {
+                    "Label": {"default":"Session Host Instance Parameters" },
+                    "Parameters": ["SessionHostNames", "SessionHostInstanceType"]
+                },
+                {
+                    "Label": {"default": "S3 Parameters"},
+                    "Parameters": ["S3Bucket", "AdNamingS3Key", "BrokerNamingS3Key", "VpcHelperS3Key", "VpcNamingS3Key", "SessionHostNamingS3Key", "WinAcmeS3Key"]
+                }
+            ],
+            "ParameterLabels": {
+                "AdInstanceType": {"default": "Instance Type"},
+                "AdNamingS3Key": {"default":"S3 Key"},
+                "ADServer1Ip": {"default": "AD Server 1 Ip"},
+                "ADServer2Ip": {"default": "AD Server 2 Ip"},
+                "ADServerName": {"default": "Domain Controller Name"},
+                "AllocationId": {"default": "Allocation ID"},
+                "BrokerInstanceType": {"default": "Broker Instance Type"},
+                "BrokerNamingS3Key": {"default": "Broker Naming S3 Key"},
+                "BrokerServerName": {"default": "Broker Server Name"},
+                "CustomerAbbreviation": {"default":"Customer Abbreviation"},
+                "CustomerGatewayIpAddress": {"default":"Customer Gateway IP Address"},
+                "CreateTransitGateway": {"default":"Enable Transit Gateway"},
+                "DomainAdminPassword": {"default": "Domain Admin Password"},
+                "DomainAdminUserName": {"default": "Domain Admin User Name"},
+                "DomainDNSName": {"default": "Fully Qualified Domain Name"},
+                "DomainNetBIOSName": {"default": "Domain NetBIOS Name"},
+                "GatewayExternalFqdn": {"default": "Gateway External DNS Name"},
+                "LatestAmiId": {"default": "Ami Id"},
+                "LocalAdminPassword": {"default": "Local Admin Password"},
+                "LocalAdminUserName": {"default": "Local Admin Username"},
+                "S3Bucket": {"default":"S3 Bucket"},
+                "Server1Name": {"default": "Server 1 Name"},
+                "Server1Ip": {"default": "Server 1 Ip"},
+                "Server2Name": {"default": "Server 2 Name"},
+                "Server2Ip": {"default": "Server 2 Ip"},
+                "SessionHostInstanceType": {"default": "Instance Type"},
+                "SessionHostNames": {"default": "Session Host Names"},
+                "SessionHostNamingS3Key":{"default": "Session Host Naming S3 Key"},
+                "Subnet1Cidr": {"default": "Subnet 1 Cidr"},
+                "Subnet2Cidr": {"default":"Subnet 2 Cidr"},
+                "VpcCidr": {"default": "VPC 1 Cidr"},
+                "VpcHelperS3Key": {"default":"Helper S3 Key"},
+                "VpcNamingS3Key": {"default":"Naming S3 Key"},
+                "VpnDestinationCidr": {"default":"VPN Destination Cidr"},
+                "WinAcmeS3Key": {"default": "Win Acme S3 Key"}
+            }
+        }
+    },
+    "Parameters": {
+        "AdInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t3a.large",
+            "AllowedValues": [
+                "t3a.large",
+                "t3a.xlarge",
+                "t3a.2xlarge"
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "AdNamingS3Key": {
+            "Default": "ad-stack-naming.zip",
+            "Description": "The name of the ZIP package of the naming funciton",
+            "Type": "String"
+        },
+        "ADServer1Ip": {
+            "Description": "IP address of the primary Active Directory server",
+            "Type": "String"
+        },
+        "ADServer2Ip": {
+            "Description": "IP address of the secondary Active Directory server",
+            "Type": "String",
+            "Default": ""
+        },
+        "ADServerName": {
+            "Description": "Name of an existing Active Directory Controller Server in the target domain",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "AllocationId": {
+            "Description": "The allocation ID of the elastic IP address for the gateway",
+            "Type": "String"
+        },
+        "BrokerInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t3a.xlarge",
+            "AllowedValues": [
+                "t3a.large",
+                "t3a.xlarge",
+                "t3a.2xlarge"
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "BrokerNamingS3Key": {
+            "Default": "bk-stack-naming.zip",
+            "Description": "The name of the packaged lambda function code for the naming function.",
+            "Type": "String"
+        },
+        "BrokerServerName": {
+            "Description": "Name of the Remote Desktop Services broker server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "CustomerAbbreviation": {
+            "AllowedPattern": "^[a-z]{2,}$",
+            "ConstraintDescription": "Customer abbreviation must have a miniumum of 2 characters",
+            "Description": "Customer abbreviation",
+            "Type": "String"
+        },
+        "CustomerGatewayIpAddress": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+            "ConstraintDescription": "IP Address parameter must be in the form x.x.x.x",
+            "Description": "IP address of the customer's gateway",
+            "Type": "String"
+        },
+        "CreateTransitGateway": {
+            "AllowedValues" : ["true", "false"],
+            "Default": "false",
+            "Description": "Enter true/false if this CloudFormation template will deploy a transit gateway",
+            "Type": "String"
+        },
+        "DomainAdminPassword": {
+            "Description": "The password of the AD account username provided",
+            "NoEcho":"true",
+            "Type": "String"
+        },
+        "DomainAdminUserName": {
+            "Description": "The username of an AD account with admin privileges",
+            "Type": "String"
+        },
+        "DomainDNSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+",
+            "Description": "Fully qualified domain name (FQDN) of the forest root domain",
+            "MaxLength": "25",
+            "MinLength": "3",
+            "Type": "String"
+        },
+        "DomainNetBIOSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+",
+            "Description": "NetBIOS name of the domain (up to 15 characters)",
+            "MaxLength": "15",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "GatewayExternalFqdn": {
+            "Description": "The external DNS Name of the gateway (e.g. rds.example.com)",
+            "Type": "String"
+        },
+        "LatestAmiId": {
+             "Default": "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base",
+             "Description": "System Manager parameter value for latest Windows Server AMI",
+             "Type": "String"
+        },
+        "LocalAdminPassword": {
+            "Description": "A password for the local admin account",
+            "NoEcho":"true",
+            "Type": "String"
+        },
+        "LocalAdminUserName": {
+            "Description": "A username for a local admin account",
+            "Default": "nctech",
+            "Type": "String"
+        },
+        "S3Bucket": {
+            "Default": "netcov-set-devtest1-internal-us-west-1",
+            "Description": "The name of the bucket that contains your packaged source",
+            "Type": "String",
+            "AllowedValues":[
+                "netcov-set-devtest1-internal-us-east-1",
+                "netcov-set-devtest1-internal-us-east-2",
+                "netcov-set-devtest1-internal-us-west-1",
+                "netcov-set-devtest1-internal-us-west-2"
+            ]
+        },
+        "Server1Name": {
+            "Description": "Name of the first Active Directory server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "Server1Ip": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+            "Description": "Static IP to assign to the first Active Directory server",
+            "Type": "String"
+        },
+        "Server2Name": {
+            "Description": "Name of the second Active Directory server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "Server2Ip": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$",
+            "Description": "Static IP to assign to the second Active Directory server",
+            "Type": "String"
+        },
+        "SessionHostInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "r6i.large",
+            "AllowedValues": [
+                "r6i.large",
+                "r6i.2xlarge",
+                "r6i.4xlarge" 
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "SessionHostNames": {
+            "Description": "Comma separated list of the session server names",
+            "Type": "CommaDelimitedList"
+        },
+        "SessionHostNamingS3Key": {
+            "Default": "sh-stack-naming.zip",
+            "Description": "The name of the packaged lambda function code for the naming function.",
+            "Type": "String"
+        },
+        "Subnet1Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC subnet 1",
+            "Type": "String"
+        },
+        "Subnet2Cidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC subnet 2",
+            "Type": "String"
+        },
+        "VpcCidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block for the VPC",
+            "Type": "String"
+        },
+        "VpcHelperS3Key": {
+            "Default": "vpc-stack-helper.zip",
+            "Description": "The name of the ZIP package of the helper funciton",
+            "Type": "String"
+        },
+        "VpcNamingS3Key": {
+            "Default": "vpc-stack-naming.zip",
+            "Description": "The name of the ZIP package of the naming funciton",
+            "Type": "String"
+        },
+        "VpnDestinationCidr": {
+            "AllowedPattern": "^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\\/(1[6-9]|2[0-8]))$",
+            "ConstraintDescription": "CIDR block parameter must be in the form x.x.x.x/16-28",
+            "Description": "CIDR block of network on the remote side of the VPN",
+            "Type": "String"
+        },
+        "WinAcmeS3Key": {
+            "Default": "win-acme.v2.2.4.1500.x64.pluggable.zip",
+            "Description": "The name of the package for the ssl function cert process.",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "VpcStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters":{
+                    "CustomerAbbreviation": {"Ref": "CustomerAbbreviation"},
+                    "CustomerGatewayIpAddress": {"Ref": "CustomerGatewayIpAddress"},
+                    "CreateTransitGateway": {"Ref": "CreateTransitGateway"},
+                    "HelperS3Key": {"Ref": "VpcHelperS3Key"},
+                    "NamingS3Key": {"Ref": "VpcNamingS3Key"},
+                    "S3Bucket": {"Ref": "S3Bucket"},
+                    "Subnet1Cidr": {"Ref": "Subnet1Cidr"},
+                    "Subnet2Cidr": {"Ref": "Subnet2Cidr"},
+                    "VpcCidr": {"Ref": "VpcCidr"},
+                    "VpnDestinationCidr": {"Ref": "VpnDestinationCidr"}
+                },
+                "TemplateURL": "https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-VPC-Stack.template"
+            }
+        },
+        "ActiveDirectoryStack": {
+            "DependsOn": "VpcStackWaitCondition",
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters":{
+                    "ADServer1Ip": {"Ref": "ADServer1Ip"},
+                    "ADServer2Ip": {"Ref": "ADServer2Ip"},
+                    "CustomerAbbreviation": {"Ref": "CustomerAbbreviation"},
+                    "DomainAdminPassword": {"Ref": "DomainAdminPassword"},
+                    "DomainAdminUserName": {"Ref": "DomainAdminUserName"},
+                    "DomainDNSName": {"Ref": "DomainDNSName"},
+                    "DomainNetBIOSName": {"Ref": "DomainNetBIOSName"},
+                    "InstanceType": {"Ref": "AdInstanceType"},
+                    "LatestAmiId": {"Ref": "LatestAmiId"},
+                    "LocalAdminPassword": {"Ref": "LocalAdminPassword"},
+                    "LocalAdminUserName": {"Ref": "LocalAdminUserName"},
+                    "SecurityGroupId": {"Fn::GetAtt": ["VpcStack","Outputs.SecurityGroupId"]},
+                    "Server1Name": {"Ref": "Server1Name"},
+                    "Server1Ip": {"Ref": "Server1Ip"},
+                    "Server2Name": {"Ref": "Server2Name"},
+                    "Server2Ip": {"Ref": "Server2Ip"},
+                    "Subnet1Id": {"Fn::GetAtt": ["VpcStack","Outputs.Subnet1Id"]},
+                    "Subnet2Id": {"Fn::GetAtt": ["VpcStack","Outputs.Subnet2Id"]},
+                    "S3Key": {"Ref":"AdNamingS3Key"},
+                    "S3Bucket": {"Ref":"S3Bucket"},
+                    "VpcId": {"Fn::GetAtt": ["VpcStack","Outputs.VpcId"]}
+                },
+                "TemplateURL": "https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-AD-Stack.template"
+            }
+        },
+        "RemoteDesktopStack": {
+            "DependsOn": "ActiveDirectoryStack",
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters":{
+                    "ADServerName": {"Ref": "ADServerName"},
+                    "AllocationId": {"Ref": "AllocationId"},
+                    "BrokerInstanceType": {"Ref": "BrokerInstanceType"},
+                    "BrokerNamingS3Key": {"Ref": "BrokerNamingS3Key"},
+                    "BrokerServerName": {"Ref": "BrokerServerName"},
+                    "BrokerSubnetId": {"Fn::GetAtt": ["VpcStack","Outputs.Subnet1Id"]},
+                    "CustomerAbbreviation": {"Ref": "CustomerAbbreviation"},
+                    "DomainAdminUserName": {"Ref": "DomainAdminUserName"},
+                    "DomainAdminPassword": {"Ref": "DomainAdminPassword"},
+                    "DomainDNSName": {"Ref": "DomainDNSName"},
+                    "DomainNetBIOSName": {"Ref": "DomainNetBIOSName"},
+                    "GatewayExternalFqdn": {"Ref": "GatewayExternalFqdn"},
+                    "KeyPairName": {"Fn::GetAtt": ["ActiveDirectoryStack", "Outputs.KeyPairName"]},
+                    "LatestAmiId": {"Ref": "LatestAmiId"},
+                    "LocalAdminPassword": {"Ref": "LocalAdminPassword"},
+                    "LocalAdminUserName": {"Ref": "LocalAdminUserName"},
+                    "S3Bucket":{"Ref": "S3Bucket"},
+                    "SecurityGroupId": {"Fn::GetAtt": ["VpcStack","Outputs.SecurityGroupId"]},
+                    "SessionHostInstanceType": {"Ref": "SessionHostInstanceType"},
+                    "SessionHostNames": {"Fn::Join": [",", {"Ref": "SessionHostNames"}]},
+                    "SessionHostNamingS3Key":{"Ref": "SessionHostNamingS3Key"},
+                    "SessionHostSubnetId": {"Fn::GetAtt": ["VpcStack","Outputs.Subnet2Id"]},
+                    "VpcId": {"Fn::GetAtt": ["VpcStack","Outputs.VpcId"]},
+                    "WinAcmeS3Key": {"Ref": "WinAcmeS3Key"}
+                },
+                "TemplateURL": "https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-RD-Stack.template"
+            }
+        },
+        "VpcStackWaitCondition": {
+            "Type": "AWS::CloudFormation::WaitCondition",
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Timeout": "PT12H"
+                }
+            }
+        },
+        "WaitLambdaExecutionRole": {
+			"Type": "AWS::IAM::Role",
+		    "Properties": {
+		    	"AssumeRolePolicyDocument": {
+			    	"Version": "2012-10-17",
+		        	"Statement": [
+                        {
+		      	  			"Effect": "Allow",
+    		        		"Principal": {
+								"Service": [
+									"lambda.amazonaws.com"
+								]
+                            },
+							"Action": [
+                                "sts:AssumeRole"
+                            ]
+		    		    }
+                    ]
+		    	},
+		    	"Path": "/",
+		    	"Policies": [
+                    {
+						"PolicyName": "WaitFunctionLambdaExecutionRolePolicy",
+						"PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:DescribeVpnConnections",
+                                        "cloudformation:SignalResource"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+									"Effect": "Allow",
+									"Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+									"Resource": "arn:aws:logs:*:*:*"
+								}
+                            ]
+                        }
+					}
+                ],
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+			}
+		},
+        "WaitFunction": {
+            "Type" : "AWS::Lambda::Function",
+            "Properties" : {
+                "Code" : {
+                    "ZipFile": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "import boto3",
+                                "import os",
+                                "def lambda_handler(event, context):",
+                                "    print(event)",
+                                "    vpn_connection_id = os.environ['VpnConnectionId']",
+                                "    region = os.environ['Region']",
+                                "    stack_name = os.environ['StackName']",
+                                "    logical_resource_id = os.environ['LogicalResourceId']",
+                                "    if not vpn_connection_id or not region or not stack_name or not logical_resource_id:",
+                                "        print('Missing required parameters: VpnConnectionId, Region, StackName, LogicalResourceId')",
+                                "        return {",
+                                "            'statusCode': 400,",
+                                "            'body': 'Missing required parameters: VpnConnectionId, Region, StackName, LogicalResourceId'",
+                                "        }",
+                                "    ec2_client = boto3.client('ec2', region_name=region)",
+                                "    cfn_client = boto3.client('cloudformation', region_name=region)",
+                                "    try:",
+                                "        response = ec2_client.describe_vpn_connections(",
+                                "            VpnConnectionIds=[vpn_connection_id]",
+                                "        )",
+                                "        vpn_connections = response.get('VpnConnections', [])",
+                                "        if not vpn_connections:",
+                                "            print('VPN connection not found')",
+                                "            return {",
+                                "                'statusCode': 404,",
+                                "                'body': 'VPN connection not found'",
+                                "            }",
+                                "        vpn_connection = vpn_connections[0]",
+                                "        vgw_telemetry = vpn_connection.get('VgwTelemetry', [])",
+                                "        if any(telemetry.get('Status') == 'UP' for telemetry in vgw_telemetry):",
+                                "            cfn_client.signal_resource(",
+                                "                StackName=stack_name,",
+                                "                LogicalResourceId=logical_resource_id,",
+                                "                UniqueId=context.aws_request_id,",
+                                "                Status='SUCCESS'",
+                                "            )",
+                                "            print('VPN connection is UP, success signal sent to CloudFormation')",
+                                "            return {",
+                                "                'statusCode': 200,",
+                                "                'body': 'VPN connection is UP, success signal sent to CloudFormation'",
+                                "            }",
+                                "        else:",
+                                "            print('VPN connection is not UP, no signal sent')",
+                                "            return {",
+                                "                'statusCode': 200,",
+                                "                'body': 'VPN connection is not UP, no signal sent'",
+                                "            }",
+                                "    except Exception as e:",
+                                "        return {",
+                                "            'statusCode': 500,",
+                                "            'body': f'Error: {str(e)}'",
+                                "        }"
+                            ]
+                        ]
+                    }
+                },
+                "Description" : "This function waits for the vpn tunnel to be up before allowing the AD stack to run.",
+                "Handler": "index.lambda_handler",
+                "MemorySize": 512,
+                "Role": {"Fn::GetAtt": ["WaitLambdaExecutionRole", "Arn"]},
+                "Runtime": "python3.8",
+                "Environment": {
+                    "Variables": {
+                    "VpnConnectionId": {"Fn::GetAtt": ["VpcStack","Outputs.VpnConnectionId"]},
+                    "Region": {"Ref": "AWS::Region"},
+                    "StackName": {"Ref": "AWS::StackName"},
+                    "LogicalResourceId": "VpcStackWaitCondition"
+                    }
+                },
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+            }
+        },
+        "ScheduledRule": {
+            "Type": "AWS::Events::Rule",
+            "Properties": {
+                "Description": "Scheduled rule for the wait lambda function",
+                "ScheduleExpression": "rate(10 minutes)",
+                "State": "ENABLED",
+                "Targets": [
+                    {
+                        "Arn": {"Fn::GetAtt": ["WaitFunction", "Arn"]},
+                        "Id": "WaitFunctionV1"
+                    }
+                ]
+            }
+        },
+        "EventsPermission": {
+            "Type": "AWS::Lambda::Permission",
+            "Properties": {
+                "FunctionName": {"Ref": "WaitFunction"},
+                "Action": "lambda:InvokeFunction",
+                "Principal": "events.amazonaws.com",
+                "SourceArn": {"Fn::GetAtt": ["ScheduledRule", "Arn"]}
+            }
+        }
+    }
+}

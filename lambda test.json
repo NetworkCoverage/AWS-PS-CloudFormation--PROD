@@ -1,0 +1,165 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+      "VpcStackWaitCondition": {
+        "Type": "AWS::CloudFormation::WaitCondition",
+        "CreationPolicy": {
+          "ResourceSignal": {
+            "Timeout": "PT12H"
+          }
+        }
+      },
+      "WaitLambdaExecutionRole": {
+        "Type": "AWS::IAM::Role",
+        "Properties": {
+          "AssumeRolePolicyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+              {
+                "Effect": "Allow",
+                "Principal": {
+                  "Service": [
+                    "lambda.amazonaws.com"
+                  ]
+                },
+                "Action": [
+                  "sts:AssumeRole"
+                ]
+              }
+            ]
+          },
+          "Path": "/",
+          "Policies": [
+            {
+              "PolicyName": "WaitFunctionLambdaExecutionRolePolicy",
+              "PolicyDocument": {
+                "Version": "2012-10-17",
+                "Statement": [
+                  {
+                    "Effect": "Allow",
+                    "Action": [
+                      "ec2:DescribeVpnConnections",
+                      "cloudformation:SignalResource",
+                      "logs:CreateLogGroup",
+                      "logs:CreateLogStream",
+                      "logs:PutLogEvents"
+                    ],
+                    "Resource": "*"
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "WaitFunction": {
+        "Type": "AWS::Lambda::Function",
+        "Properties": {
+          "Code": {
+            "ZipFile": {
+              "Fn::Join": [
+                "\n",
+                [
+                  "import boto3",
+                  "import os",
+                  "",
+                  "def lambda_handler(event, context):",
+                  "    print(event)",
+                  "    vpn_connection_id = os.environ['VpnConnectionId']",
+                  "    region = os.environ['Region']",
+                  "    stack_name = os.environ['StackName']",
+                  "    logical_resource_id = os.environ['LogicalResourceId']",
+                  "    if not vpn_connection_id or not region or not stack_name or not logical_resource_id:",
+                  "        return {",
+                  "            'statusCode': 400,",
+                  "            'body': 'Missing required parameters: VpnConnectionId, Region, StackName, LogicalResourceId'",
+                  "        }",
+                  "    ec2_client = boto3.client('ec2', region_name=region)",
+                  "    cfn_client = boto3.client('cloudformation', region_name=region)",
+                  "    try:",
+                  "        response = ec2_client.describe_vpn_connections(",
+                  "            VpnConnectionIds=[vpn_connection_id]",
+                  "        )",
+                  "        vpn_connections = response.get('VpnConnections', [])",
+                  "        if not vpn_connections:",
+                  "            return {",
+                  "                'statusCode': 404,",
+                  "                'body': 'VPN connection not found'",
+                  "            }",
+                  "        vpn_connection = vpn_connections[0]",
+                  "        vgw_telemetry = vpn_connection.get('VgwTelemetry', [])",
+                  "        if any(telemetry.get('Status') == 'UP' for telemetry in vgw_telemetry):",
+                  "            cfn_client.signal_resource(",
+                  "                StackName=stack_name,",
+                  "                LogicalResourceId=logical_resource_id,",
+                  "                UniqueId=context.aws_request_id,",
+                  "                Status='SUCCESS'",
+                  "            )",
+                  "            return {",
+                  "                'statusCode': 200,",
+                  "                'body': 'VPN connection is UP, success signal sent to CloudFormation'",
+                  "            }",
+                  "        else:",
+                  "            return {",
+                  "                'statusCode': 200,",
+                  "                'body': 'VPN connection is not UP, no signal sent'",
+                  "            }",
+                  "    except Exception as e:",
+                  "        return {",
+                  "            'statusCode': 500,",
+                  "            'body': f'Error: {str(e)}'",
+                  "        }"
+                ]
+              ]
+            }
+          },
+          "Handler": "index.lambda_handler",
+          "MemorySize": 512,
+          "Role": {
+            "Fn::GetAtt": ["WaitLambdaExecutionRole", "Arn"]
+          },
+          "Runtime": "python3.8",
+          "Environment": {
+            "Variables": {
+              "VpnConnectionId": "vpn-0ee5b25b30a72fb72",
+              "Region": "us-west-2",
+              "StackName": {
+                "Ref": "AWS::StackName"
+              },
+              "LogicalResourceId": "VpcStackWaitCondition"
+            }
+          }
+        }
+      },
+      "ScheduledRule": {
+        "Type": "AWS::Events::Rule",
+        "Properties": {
+          "Description": "ScheduledRule",
+          "ScheduleExpression": "rate(10 minutes)",
+          "State": "ENABLED",
+          "Targets": [
+            {
+              "Arn": {
+                "Fn::GetAtt": ["WaitFunction", "Arn"]
+              },
+              "Id": "WaitFunctionV1"
+            }
+          ]
+        }
+      },
+      "PermissionForEventsToInvokeLambda": {
+        "Type": "AWS::Lambda::Permission",
+        "Properties": {
+          "FunctionName": {
+            "Ref": "WaitFunction"
+          },
+          "Action": "lambda:InvokeFunction",
+          "Principal": "events.amazonaws.com",
+          "SourceArn": {
+            "Fn::GetAtt": ["ScheduledRule", "Arn"]
+          }
+        }
+      }
+    }
+  }
+  

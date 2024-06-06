@@ -1,0 +1,16 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "Instance": {
+            "Type" : "AWS::EC2::Instance",
+            "Properties" : {
+                "ImageId" : "ami-0c0ec0a3a3a4c34c0",
+                "InstanceType" : "t3a.small",
+                "KeyName" : "ec2-keypair-us-west-2",
+                "SecurityGroupIds" : ["sg-07125ab6ebb601af3"],
+                "SubnetId" : "subnet-0f827214a25498768",
+                
+            }
+        }          
+    }
+}

@@ -1,0 +1,431 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Deploys a remote desktop session host",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {"default": "Customer Information"},
+                    "Parameters": ["CustomerAbbreviation"]
+                },
+                {
+                    "Label": {"default": "Network Configuration"},
+                    "Parameters": ["SubnetId", "SecurityGroupId"]
+                },
+                {
+                    "Label": {"default": "Active Directory Parameters"},
+                    "Parameters": ["DomainAdminUserName", "DomainAdminPassword","DomainDNSName","DomainNetBIOSName"]
+                },
+                {
+                    "Label": {"default":"Amazon EC2 Configuration" },
+                    "Parameters": ["VmName", "InstanceType", "LatestAmiId", "KeyPairName", "LocalAdminUserName", "LocalAdminPassword"]
+                },
+                {
+                    "Label": {"default":"Nested Stack Parameters"},
+                    "Parameters": ["Nested", "NamingLambdaExecutionRoleArn", "SessionHostNamingFunctionArn", "WaitHandle"]
+                },
+                {
+                    "Label": {"default": "S3 Parameters"},
+                    "Parameters": ["S3Bucket", "S3Key"]
+                }
+            ],
+            "ParameterLabels": {
+                "CustomerAbbreviation": {"default": "Customer Abbreviation"},
+                "DomainAdminUserName": {"default": "Domain Admin User Name"},
+                "DomainAdminPassword": {"default": "Domain Admin Password"},
+                "DomainDNSName": {"default": "Domain DNS Name"},
+                "DomainNetBIOSName": {"default": "Domain NetBIOS Name"},
+                "InstanceType": {"default": "Instance Type"},
+                "KeyPairName": {"default": "Key Pair Name"},
+                "LatestAmiId": {"default": "Ami Id"},
+                "LocalAdminPassword": {"default": "Local Admin Password"},
+                "LocalAdminUserName": {"default": "Local Admin Username"},
+                "NamingLambdaExecutionRoleArn": {"default": "Naming Lambda Execution Role Arn"},
+                "Nested": {"default": "Nested Stack"},
+                "S3Bucket":{"default": "S3Bucket"},
+                "S3Key":{"default": "S3Key"},
+                "SecurityGroupId": {"default": "Security Group Id"},
+                "SessionHostNamingFunctionArn": {"default": "Session Host Naming Function Arn"},
+                "SubnetId": {"default": "Subnet Id"},
+                "VmName": {"default": "Vm Name"},
+                "WaitHandle": {"default": "Wait Handle"}              
+            }
+        }
+    },
+    "Parameters": {
+        "CustomerAbbreviation": {
+            "AllowedPattern": "^[a-z]{2,}$",
+            "ConstraintDescription": "Customer abbreviation must have a miniumum of 2 characters",
+            "Description": "Customer abbreviation",
+            "Type": "String"
+        },
+        "DomainAdminPassword": {
+            "Description": "The password of the AD account username provided",
+            "NoEcho":"true",
+            "Type": "String"
+        },
+        "DomainAdminUserName": {
+            "Description": "The username of an AD account with admin privileges",
+            "Type": "String"
+        },
+        "DomainDNSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+",
+            "Description": "DNS name of the forest root domain",
+            "MaxLength": "25",
+            "MinLength": "3",
+            "Type": "String"
+        },
+        "DomainNetBIOSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+",
+            "Description": "NetBIOS name of the domain (up to 15 characters)",
+            "MaxLength": "15",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "InstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "r6i.large",
+            "AllowedValues": [
+                "r6i.large",
+                "r6i.2xlarge",
+                "r6i.4xlarge" 
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "KeyPairName":{
+            "Description": "The name of the key pair to use to launch the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "LatestAmiId": {
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+            "Description": "System Manager parameter value for latest Windows Server AMI",
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+        },
+        "LocalAdminPassword": {
+            "Description": "A password for the local admin account",
+            "NoEcho":"true",
+            "Type": "String"
+        },
+        "LocalAdminUserName": {
+            "Description": "A username for a local admin account",
+            "Default": "nctech",
+            "Type": "String"
+        },
+        "NamingLambdaExecutionRoleArn": {
+            "Description": "The Arn of an existing IAM role for the naming function.",
+            "Default": "",
+            "Type": "String"
+        },
+        "Nested": {
+            "Description": "Boolean specifying whether or not the stack is nested.",
+            "Default": "false",
+            "Type": "String"
+        },
+        "S3Bucket": {
+            "Default": "netcov-set-devtest1-internal-us-west-1",
+            "Description": "The name of the bucket that contains your packaged lambda source code.",
+            "Type": "String",
+            "AllowedValues":[
+                "netcov-set-devtest1-internal-us-east-1",
+                "netcov-set-devtest1-internal-us-east-2",
+                "netcov-set-devtest1-internal-us-west-1",
+                "netcov-set-devtest1-internal-us-west-2"
+            ]
+        },
+        "S3Key": {
+            "Default": "sh-stack-naming.zip",
+            "Description": "The name of the packaged lambda function code for the naming function.",
+            "Type": "String"
+        },
+        "SecurityGroupId": {
+            "Description": "VPC access security group ID",
+            "Type": "AWS::EC2::SecurityGroup::Id"
+        },
+        "SessionHostNamingFunctionArn": {
+            "Description": "The Arn of an existing naming function for the session host server.",
+            "Default": "",
+            "Type": "String"
+        },
+        "SubnetId": {
+            "Description": "ID of the subnet in the first availability zone",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "VmName": {
+            "Description": "Name of the Remote Desktop Services session host server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "WaitHandle": {
+            "Description": "Solely required when this stack is run from the parent RD stack - Presigned URL that recieves signals indicating completion is operations external to the stack.",
+            "Type": "String"
+        }
+    },
+    "Conditions": {
+        "StandaloneStack": {
+            "Fn::Equals": [{"Ref": "Nested"}, "false"]
+        }
+    },
+    "Resources": {
+        "Rds": {
+            "Type": "AWS::EC2::Instance",
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "config": {
+                        "files": {
+                            "c:\\cfn\\cfn-hup.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[main]\n",
+                                            "stack=", {"Ref": "AWS::StackId"}, "\n",
+                                            "region=", {"Ref": "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[cfn-auto-reloader-hook]\n",
+                                            "triggers=post.update\n",
+                                            "path=Resources.Rds.Metadata.AWS::CloudFormation::Init\n",
+                                            "action=cfn-init.exe -v -s ", {"Ref": "AWS::StackId"}, " -r Rds", " --region ", {"Ref": "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            }
+                        },
+                        "commands": {
+                            "a-set-static-ip": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command \"",
+                                            "$netip = Get-NetIPConfiguration; ",
+                                            "$ipconfig = Get-NetIPAddress | ?{$_.IpAddress -eq $netip.IPv4Address.IpAddress}; ",
+                                            "Get-NetAdapter | Set-NetIPInterface -DHCP Disabled; ",
+                                            "Get-NetAdapter | New-NetIPAddress -AddressFamily IPv4 -IPAddress $netip.IPv4Address.IpAddress -PrefixLength $ipconfig.PrefixLength -DefaultGateway $netip.IPv4DefaultGateway.NextHop; ",
+                                            "Get-NetAdapter | Set-DnsClientServerAddress -ServerAddresses $netip.DNSServer.ServerAddresses;\"\n"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "b-join-domain": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Add-Computer -DomainName ",
+                                            {"Ref": "DomainDNSName"},
+                                            " -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOSName"}, "\\", {"Ref": "DomainAdminUserName"},
+                                            "', (ConvertTo-SecureString -String ",
+                                            {"Ref": "DomainAdminPassword"},
+                                            " -AsPlainText -Force))) -NewName ",
+                                            {"Ref": "VmName"}, " -Force"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "c-remove-windows-defender": {
+                                "command": "powershell.exe -command Remove-WindowsFeature -Name Windows-Defender",
+                                "waitAfterCompletion": "60"
+                            },
+                            "d-enable-remotefx": {
+                                "command": "powershell.exe -command New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services' -Name 'fEnableRemoteFXAdvancedRemoteApp' -Value 0 -PropertyType DWORD -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "e-turn-off-uac": {
+                                "command": "powershell.exe -command Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name 'ConsentPromptBehaviorAdmin' -Value 0",
+                                "waitAfterCompletion": "0"
+                            },
+                            "f-turn-off-windows-firewall": {
+                                "command": "powershell.exe -command Set-NetFirewallProfile -All -Enabled False",
+                                "waitAfterCompletion": "0"
+                            },
+                            "g-enable-powershell-remoting": {
+                                "command": "powershell.exe -command Enable-PSRemoting",
+                                "waitAfterCompletion": "0"
+                            },
+                            "h-enable-credssp-server": {
+                                "command": "powershell.exe -command Enable-WSManCredSSP -Role Server -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "i-rename-local-admin": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUserName"}]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "j-reset-local-admin-pw": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUserName"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "k-restart-computer": {
+                                "command": "powershell.exe -command Restart-Computer",
+                                "waitAfterCompletion": "forever"
+                            },
+                            "l-send-resource-signal": {
+                                "command": {"Fn::Join": ["", ["cfn-signal.exe --stack ", {"Ref": "AWS::StackId"}, " --resource Rds --region ", {"Ref": "AWS::Region"}]]}
+                            },
+                            "m-send-wait-signal": {
+                                "command" : {"Fn::Join" : ["", ["cfn-signal.exe -e 0 \"", {"Fn::Base64": {"Ref": "WaitHandle"}},"\""]]}
+                            }
+                        },
+                        "services": {
+                            "windows": {
+                                "cfn-hup": {
+                                    "enabled": "true",
+                                    "ensureRunning": "true",
+                                    "files": [
+                                        "c:\\cfn\\cfn-hup.conf",
+                                        "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties": {
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {"VolumeSize": "100", "VolumeType": "gp3"}
+                    }
+                ],
+                "ImageId": {"Ref": "LatestAmiId"},
+                "InstanceType": {"Ref": "InstanceType"},
+                "KeyName": {"Ref": "KeyPairName"},
+                "Monitoring": "true",
+                "SecurityGroupIds": [{"Ref": "SecurityGroupId"}],
+                "SubnetId": {"Ref":"SubnetId"},
+                "Tags": [
+                    {"Key": "Name", "Value": {"Ref": "VmName"}},
+                    {"Key": "map-migrated", "Value": "d-server-03jpm34ivsp1f1"}                    
+                ], 
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "", 
+                            [
+                                "<script>\n",                  
+                                "cfn-init.exe -v -s ", {"Ref": "AWS::StackId"}, " -r Rds --region ", {"Ref": "AWS::Region"}, "\n",
+                                "</script>"       
+                            ]
+                        ]
+                    }
+                }
+            },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Timeout": "PT60M"
+                }
+            }
+        },
+        "NamingLambdaExecutionRole": {
+            "Condition": "StandaloneStack",
+			"Type": "AWS::IAM::Role",
+		    "Properties": {
+		    	"AssumeRolePolicyDocument": {
+			    	"Version": "2012-10-17",
+		        	"Statement": [
+                        {
+		      	  			"Effect": "Allow",
+    		        		"Principal": {
+								"Service": [
+									"lambda.amazonaws.com"
+								]
+                            },
+							"Action": [
+                                "sts:AssumeRole"
+                            ]
+		    		    }
+                    ]
+		    	},
+		    	"Path": "/",
+		    	"Policies": [
+                    {
+						"PolicyName": "NamingFunctionLambdaExecutionRolePolicy",
+						"PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:CreateTags",
+                                        "ec2:DescribeInstances",
+                                        "ec2:DescribeNetworkInterfaces",
+                                        "ec2:DescribeSubnets",
+                                        "ec2:DescribeVolumes",
+                                        "ec2:ModifyNetworkInterfaceAttribute",
+                                        "iam:ListRoles",
+                                        "iam:CreateServiceLinkedRole",
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+									"Effect": "Allow",
+									"Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+									"Resource": "arn:aws:logs:*:*:*"
+								}
+                            ]
+                        }
+					}
+                ],
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+			}
+		},
+        "SessionHostNamingFunction": {
+            "Condition": "StandaloneStack",
+            "Type" : "AWS::Lambda::Function",
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket": {"Ref": "S3Bucket"},
+                    "S3Key": {"Ref": "S3Key"}
+                },
+                "Description" : "This function generates the name tag for all the resources",
+
+                "Handler" : "sh-stack-naming::sh_stack_naming.Bootstrap::ExecuteFunction",
+                "MemorySize" : 512,
+                "Role" : {
+                    "Fn::If":[
+                        "StandaloneStack",
+                        {"Fn::GetAtt" : ["NamingLambdaExecutionRole", "Arn"]},
+                        {"Ref": "NamingLambdaExecutionRoleArn"}
+                    ]
+                },
+                "Runtime" : "dotnet8",
+                "Timeout" : 900,
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+            }
+        },
+        "InvokeSessionHostNamingFunction": {
+            "Type": "Custom::InvokeSessionHostNamingFunction",
+            "DependsOn": "Rds",
+            "Properties": {
+                "CustomerAbbreviation": {"Ref": "CustomerAbbreviation"},
+                "SessionHost": {"Ref": "Rds"},
+                "ServiceToken": {
+                    "Fn::If":[
+                        "StandaloneStack",
+                        {"Fn::GetAtt" : ["SessionHostNamingFunction", "Arn"]},
+                        {"Ref": "SessionHostNamingFunctionArn"}
+                    ]
+                },
+                "Region": {"Ref": "AWS::Region"}
+            }
+        }
+    }
+}

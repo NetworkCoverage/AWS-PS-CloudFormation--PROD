@@ -1,0 +1,352 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Transform": "AWS::LanguageExtensions",
+    "Description": "This stack deploy a dynamic number of remote desktop session host VMs followed by a remote desktop broker VM. The broker VM will also have the gateway role. The broker VM nested template will create a remote desktop deployment secured by an SSL cert. HTML5 is also enabled. The resources can be reached at https://<gateway public dns name>/RDWeb for traditional access or  https://<gateway public dns name>/RDWeb/webclient for HTML5",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {"default": "Customer Information"},
+                    "Parameters": ["CustomerAbbreviation"]
+                },
+                {
+                    "Label": {"default": "Network Configuration"},
+                    "Parameters": ["SecurityGroupId", "VpcId"]
+                },
+                {
+                    "Label": {"default": "Active Directory Parameters"},
+                    "Parameters": ["ADServerName", "DomainAdminUserName", "DomainAdminPassword","DomainDNSName","DomainNetBIOSName"]
+                },
+                {
+                    "Label": {"default":"General Amazon EC2 Configuration" },
+                    "Parameters": ["LatestAmiId", "KeyPairName", "LocalAdminUserName","LocalAdminPassword"]
+                },
+                {
+                    "Label": {"default": "Broker Amazon EC2 Configuration"},
+                    "Parameters": ["AllocationId", "BrokerInstanceType", "BrokerServerName", "BrokerSubnetId", "GatewayExternalFqdn"]
+                },
+                {
+                    "Label": {"default":"Session Host Amazon EC2 Configuration" },
+                    "Parameters": ["SessionHostNames", "SessionHostInstanceType", "SessionHostSubnetId"]
+                },
+                {
+                    "Label": {"default": "S3 Parameters"},
+                    "Parameters": ["S3Bucket", "BrokerNamingS3Key", "SessionHostNamingS3Key", "WinAcmeS3Key"]
+                }
+            ],
+            "ParameterLabels": {
+                "ADServerName": {"default": "Domain Controller Name"},
+                "AllocationId": {"default": "Allocation ID"},
+                "BrokerInstanceType": {"default": "Broker Instance Type"},
+                "BrokerNamingS3Key": {"default": "Broker Naming S3 Key"},
+                "BrokerServerName": {"default": "Broker Server Name"},
+                "BrokerSubnetId": {"default": "Broker Subnet Id"},
+                "CustomerAbbreviation": {"default": "Customer Abbreviation"},
+                "DomainAdminUserName": {"default": "Domain Admin Username"},
+                "DomainAdminPassword": {"default": "Domain Admin Password"},
+                "DomainDNSName": {"default": "Domain DNS Name"},
+                "DomainNetBIOSName": {"default": "Domain NetBIOS Name"},
+                "GatewayExternalFqdn": {"default": "Gateway External DNS Name"},
+                "KeyPairName": {"default": "Key Pair Name"},
+                "LatestAmiId": {"default": "Latest AmiId"},
+                "LocalAdminPassword": {"default": "Local Admin Password"},
+                "LocalAdminUserName": {"default": "Local Admin Username"},
+                "S3Bucket":{"default": "S3Bucket"},
+                "SecurityGroupId": {"default": "Security Group Id"},
+                "SessionHostInstanceType": {"default": "Instance Type"},
+                "SessionHostNames": {"default": "Session Host Names"},
+                "SessionHostNamingS3Key":{"default": "Session Host Naming S3 Key"},
+                "SessionHostSubnetId": {"default": "Session Host Subnet Id"},
+                "VpcId": {"default": "VPC ID"},
+                "WinAcmeS3Key": {"default": "Win Acme S3 Key"}
+            }
+        }
+    },
+    "Parameters": {
+        "ADServerName": {
+            "Description": "Name of an Active Directory Controller Server in the existing domain",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "AllocationId": {
+            "Description": "The allocation ID of the elastic IP address for the gateway",
+            "Type": "String"
+        },
+        "BrokerInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t3a.xlarge",
+            "AllowedValues": [
+                "t3a.large",
+                "t3a.xlarge",
+                "t3a.2xlarge"
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "BrokerNamingS3Key": {
+            "Default": "bk-stack-naming.zip",
+            "Description": "The name of the packaged lambda function code for the naming function.",
+            "Type": "String"
+        },
+        "BrokerServerName": {
+            "Description": "Name of the Remote Desktop Services broker server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "BrokerSubnetId": {
+            "Description": "ID of the subnet the server will be connected to",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "CustomerAbbreviation": {
+            "AllowedPattern": "^[a-z]{2,}$",
+            "ConstraintDescription": "Customer abbreviation must have a miniumum of 2 characters",
+            "Description": "Customer abbreviation",
+            "Type": "String"
+        },
+        "DomainAdminPassword": {
+            "Description": "The password of the AD account username provided",
+            "NoEcho":"true",
+            "Type": "String"
+        },
+        "DomainAdminUserName": {
+            "Description": "The username of an AD account with admin privileges",
+            "Type": "String"
+        },
+        "DomainDNSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+",
+            "Description": "DNS name of the forest root domain",
+            "MaxLength": "25",
+            "MinLength": "3",
+            "Type": "String"
+        },
+        "DomainNetBIOSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+",
+            "Description": "NetBIOS name of the domain (up to 15 characters)",
+            "MaxLength": "15",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "GatewayExternalFqdn": {
+            "Description": "The external DNS Name of the gateway (e.g. rds.example.com)",
+            "Type": "String"
+        },
+        "KeyPairName":{
+            "Description": "The name of the key pair to use to launch the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "LatestAmiId": {
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base",
+            "Description": "System Manager parameter value for latest Windows Server AMI",
+            "Type": "String"
+        },
+        "LocalAdminPassword": {
+            "Description": "A password for the local admin account",
+            "Type": "String"
+        },
+        "LocalAdminUserName": {
+            "Description": "A username for a local admin account",
+            "Default": "nctech",
+            "NoEcho":"true",
+            "Type": "String"
+        },
+        "S3Bucket": {
+            "Default": "netcov-set-devtest1-internal-us-west-1",
+            "Description": "The name of the bucket that contains your packaged lambda source code.",
+            "Type": "String",
+            "AllowedValues":[
+                "netcov-set-devtest1-internal-us-east-1",
+                "netcov-set-devtest1-internal-us-east-2",
+                "netcov-set-devtest1-internal-us-west-1",
+                "netcov-set-devtest1-internal-us-west-2"
+            ]
+        },
+        "SecurityGroupId": {
+            "Description": "VPC access security group ID",
+            "Type": "AWS::EC2::SecurityGroup::Id"
+        },
+        "SessionHostInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "r6i.large",
+            "AllowedValues": [
+                "r6i.large",
+                "r6i.2xlarge",
+                "r6i.4xlarge" 
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "SessionHostNames": {
+            "Description": "Comma separated list of the session server names",
+            "Type": "CommaDelimitedList"
+        },
+        "SessionHostNamingS3Key": {
+            "Default": "sh-stack-naming.zip",
+            "Description": "The name of the packaged lambda function code for the naming function.",
+            "Type": "String"
+        },
+        "SessionHostSubnetId": {
+            "Description": "ID of the subnet in the first availability zone",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "VpcId": {
+            "Description": "VPC ID",
+            "Type": "AWS::EC2::VPC::Id"
+        },
+        "WinAcmeS3Key": {
+            "Default": "win-acme.v2.2.4.1500.x64.pluggable.zip",
+            "Description": "The name of the package for the ssl function cert process.",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "SessionHostWaitHandle": {
+            "Type": "AWS::CloudFormation::WaitConditionHandle"
+        },
+        "SessionHostWaitCondition": {
+            "Type": "AWS::CloudFormation::WaitCondition",
+            "Properties": {
+                "Count": {"Fn::Length": {"Ref": "SessionHostNames"}},
+                "Handle": {"Ref": "SessionHostWaitHandle"},
+                "Timeout": "3600"
+            }
+        },
+        "NamingLambdaExecutionRole": {
+			"Type": "AWS::IAM::Role",
+		    "Properties": {
+		    	"AssumeRolePolicyDocument": {
+			    	"Version": "2012-10-17",
+		        	"Statement": [
+                        {
+		      	  			"Effect": "Allow",
+    		        		"Principal": {
+								"Service": [
+									"lambda.amazonaws.com"
+								]
+                            },
+							"Action": [
+                                "sts:AssumeRole"
+                            ]
+		    		    }
+                    ]
+		    	},
+		    	"Path": "/",
+		    	"Policies": [
+                    {
+						"PolicyName": "NamingFunctionLambdaExecutionRolePolicy",
+						"PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "ec2:CreateTags",
+                                        "ec2:DescribeInstances",
+                                        "ec2:DescribeNetworkInterfaces",
+                                        "ec2:DescribeSubnets",
+                                        "ec2:DescribeVolumes",
+                                        "ec2:ModifyNetworkInterfaceAttribute",
+                                        "iam:ListRoles",
+                                        "iam:CreateServiceLinkedRole",
+                                        "lambda:InvokeFunction"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+									"Effect": "Allow",
+									"Action": [
+                                        "logs:CreateLogGroup",
+                                        "logs:CreateLogStream",
+                                        "logs:PutLogEvents"
+                                    ],
+									"Resource": "arn:aws:logs:*:*:*"
+								}
+                            ]
+                        }
+					}
+                ],
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+			}
+		},
+        "SessionHostNamingFunction": {
+            "Type" : "AWS::Lambda::Function",
+            "Properties" : {
+                "Code" : {
+                    "S3Bucket": {"Ref": "S3Bucket"},
+                    "S3Key": {"Ref": "SessionHostNamingS3Key"}
+                },
+                "Description" : "This function generates the name tag for all the session host resources",
+
+                "Handler" : "sh-stack-naming::sh_stack_naming.Bootstrap::ExecuteFunction",
+                "MemorySize" : 512,
+                "Role" : {"Fn::GetAtt" : ["NamingLambdaExecutionRole", "Arn"]},
+                "Runtime" : "dotnet8",
+                "Timeout" : 900,
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}]
+            }
+        },
+        "Fn::ForEach::SessionHost":[ 
+            "SessionHostName",
+            {"Ref": "SessionHostNames"},
+            {
+                "&{SessionHostName}Stack": {
+                    "Type": "AWS::CloudFormation::Stack",
+                    "Properties": {
+                        "Parameters":{
+                            "CustomerAbbreviation": {"Ref": "CustomerAbbreviation"},
+                            "DomainAdminPassword": {"Ref": "DomainAdminPassword"},
+                            "DomainAdminUserName": {"Ref": "DomainAdminUserName"},
+                            "DomainDNSName": {"Ref": "DomainDNSName"},
+                            "DomainNetBIOSName": {"Ref": "DomainNetBIOSName"},
+                            "InstanceType": {"Ref": "SessionHostInstanceType"},
+                            "KeyPairName":{"Ref": "KeyPairName"},
+                            "LatestAmiId": {"Ref": "LatestAmiId"},
+                            "NamingLambdaExecutionRoleArn": {"Fn::GetAtt" : ["NamingLambdaExecutionRole", "Arn"]},
+                            "Nested": "true",
+                            "LocalAdminPassword": {"Ref": "LocalAdminPassword"},
+                            "LocalAdminUserName": {"Ref": "LocalAdminUserName"},
+                            "S3Bucket":{"Ref": "S3Bucket"},
+                            "SecurityGroupId": {"Ref": "SecurityGroupId"},
+                            "SessionHostNamingFunctionArn": {"Fn::GetAtt" : ["SessionHostNamingFunction", "Arn"]},
+                            "SubnetId": {"Ref": "SessionHostSubnetId"},
+                            "VmName": {"Ref": "SessionHostName"},
+                            "WaitHandle":{"Ref": "SessionHostWaitHandle"}
+                        },
+                        "TemplateURL": "https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-RD-SH-Stack.template"
+                    }
+                }                
+            }
+        ],
+        "BrokerStack": {
+            "DependsOn": "SessionHostWaitCondition",
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "Parameters":{
+                    "ADServerName": {"Ref": "ADServerName"},
+                    "AllocationId": {"Ref": "AllocationId"},
+                    "BrokerServerName": {"Ref": "BrokerServerName"},
+                    "CustomerAbbreviation": {"Ref": "CustomerAbbreviation"},
+                    "DomainAdminPassword": {"Ref": "DomainAdminPassword"},
+                    "DomainAdminUserName": {"Ref": "DomainAdminUserName"},
+                    "DomainDNSName": {"Ref": "DomainDNSName"},
+                    "DomainNetBIOSName": {"Ref": "DomainNetBIOSName"},
+                    "GatewayExternalFqdn": {"Ref": "GatewayExternalFqdn"},
+                    "InstanceType": {"Ref": "BrokerInstanceType"},
+                    "KeyPairName":{"Ref": "KeyPairName"},
+                    "LatestAmiId": {"Ref": "LatestAmiId"},
+                    "LocalAdminPassword": {"Ref": "LocalAdminPassword"},
+                    "LocalAdminUserName": {"Ref": "LocalAdminUserName"},
+                    "NamingS3Key": {"Ref": "BrokerNamingS3Key"},
+                    "S3Bucket": {"Ref": "S3Bucket"},
+                    "SecurityGroupId": {"Ref": "SecurityGroupId"},
+                    "SessionHostNames": {"Fn::Join": [",", {"Ref": "SessionHostNames"}]},
+                    "SubnetId": {"Ref": "BrokerSubnetId"},
+                    "VpcId": {"Ref": "VpcId"},
+                    "WinAcmeS3Key": {"Ref": "WinAcmeS3Key"}
+                },
+                "TemplateURL": "https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-RD-BK-Stack.template"
+            }
+        }   
+    }
+}

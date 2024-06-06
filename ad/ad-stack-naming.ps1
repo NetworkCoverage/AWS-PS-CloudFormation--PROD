@@ -53,46 +53,68 @@ $DhcpOptionsId = $LambdaInput.ResourceProperties.DhcpOptions
 $DomainController1 = $LambdaInput.ResourceProperties.DomainController1
 $DomainController2 = $LambdaInput.ResourceProperties.DomainController2
 $Region = $LambdaInput.ResourceProperties.Region
+$VpcId = $LambdaInput.ResourceProperties.VpcId
 
 try {
-    if ($LambdaInput.RequestType -eq 'Create') {        
-
+    if ($LambdaInput.RequestType -eq 'Create') {
+        switch ($Region) {
+            'us-east-1' {$RegionCode = 'use1'}
+            'us-east-2' {$RegionCode = 'use2'}
+            'us-west-1' {$RegionCode = 'usw1'}
+            'us-west-2' {$RegionCode = 'usw2'}
+            'ap-east-1' {$RegionCode = 'ape1'}
+            'ap-south-1' {$RegionCode = 'aps1'}
+            'ap-northeast-3' {$RegionCode = 'apne3'}
+            'ap-northeast-2' {$RegionCode = 'apne2'}
+            'ap-southeast-1' {$RegionCode = 'apse1'}
+            'ap-southeast-2' {$RegionCode = 'apse2'}
+            'ap-northeast-1' {$RegionCode = 'apne1'}
+            'ca-central-1' {$RegionCode = 'cac1'}
+            'eu-central-1' {$RegionCode = 'euc1'}
+            'eu-west-1' {$RegionCode = 'euw1'}
+            'eu-west-2' {$RegionCode = 'euw2'}
+            'eu-west-3' {$RegionCode = 'euw3'}
+            'eu-north-1' {$RegionCode = 'eun1'}
+            'us-gov-east-1' {$RegionCode = 'usge1'}
+            'us-gov-west-1' {$RegionCode = 'usgw1'}
+        }
         $DhcpOptionName = '{0}-{1}-vpc01-dos01' -f $CustomerAbbreviation, $RegionCode
         New-EC2Tag -Resource $DhcpOptionsId -Tag @{Key = 'Name' ; Value = $DhcpOptionName} -Region $Region
-        
-        $Subnet1Name = ((Get-EC2Subnet -SubnetId ((Get-EC2Instance -InstanceId $DomainController1 -Region $Region).Instances.SubnetId) -Region $Region).Tags | Where-Object {$_.Key -eq 'Name'}).Value
-        $Subnet2Name = ((Get-EC2Subnet -SubnetId ((Get-EC2Instance -InstanceId $DomainController2 -Region $Region).Instances.SubnetId) -Region $Region).Tags | Where-Object {$_.Key -eq 'Name'}).Value
-        
+
         # Domain Controller 1 network interface tags
+        $Subnet1Name = ((Get-EC2Subnet -SubnetId ((Get-EC2Instance -InstanceId $DomainController1 -Region $Region).Instances.SubnetId) -Region $Region).Tags | Where-Object {$_.Key -eq 'Name'}).Value
+        $DomainController1Name = ((Get-EC2Instance -InstanceId $DomainController1 -Region $Region).Instances.Tags | Where-Object {$_.Key -eq 'Name'} | Select-Object -ExpandProperty Value)
         $NetworkInterface = Get-EC2NetworkInterface -Region $Region | Where-Object {$_.Attachment.InstanceId -eq $DomainController1}
-        $NetworkInterfaceName = '{0}-{1}-{2}-{3}-eni01' -f $CustomerAbbreviation, $Subnet1Name.Split('-')[1], $Subnet1Name.Split('-')[3], $Subnet1Name.Split('-')[4]
-         
-        New-EC2Tag -Resource $NetworkInterface.NetworkInterfaceId -Tag @{Key = "map-migrated"; Value ="d-server-03jpm34ivsp1f1"} -Region $Region
-        New-EC2Tag -Resource $NetworkInterface.NetworkInterfaceId -Tag @{Key = 'Name' ; Value = $NetworkInterfaceName} -Region $Region
+        $NetworkInterfaceName = '{0}-{1}-{2}-{3}-{4}-eni01' -f $CustomerAbbreviation, $Subnet1Name.Split('-')[1], $Subnet1Name.Split('-')[3], $Subnet1Name.Split('-')[4], $DomainController1Name.Split('-')[-1].ToLower()
         
-        $Description = 'Interface eth{0} for EC2 instance {1} ({2})' -f $NetworkInterface.Attachment.DeviceIndex, $DomainController1, ((Get-EC2Instance -InstanceId $DomainController1 -Region $Region).Instances.Tags | Where-Object {$_.Key -eq 'Name'} | Select-Object -ExpandProperty Value)
+        New-EC2Tag -Resource $NetworkInterface.NetworkInterfaceId -Tag @{Key = "map-migrated"; Value ="d-server-03jpm34ivsp1f1"} -Region $Region
+        New-EC2Tag -Resource $NetworkInterface.NetworkInterfaceId -Tag @{Key = 'Name' ; Value = $NetworkInterfaceName} -Region $Region        
+        
+        $Description = 'Interface eth{0} for EC2 instance {1} ({2})' -f $NetworkInterface.Attachment.DeviceIndex, $DomainController1, $DomainController1Name.ToLower()
         Edit-EC2NetworkInterfaceAttribute -NetworkInterfaceId $NetworkInterface.NetworkInterfaceId -Description $Description -Region $Region
 
         # Domain Controller 1 volume tags
         $Volume = Get-EC2Volume -Filter @{Name = 'attachment.instance-id'; Values = $DomainController1} -Region $Region
-        $VolumeName = '{0}-{1}-dc01-vol01' -f $CustomerAbbreviation, $Subnet1Name.Split('-')[1]
+        $VolumeName = '{0}-{1}-{2}-vol01' -f $CustomerAbbreviation, $Subnet1Name.Split('-')[1], $DomainController1Name.Split('-')[-1].ToLower()
 
         New-EC2Tag -Resource $Volume.VolumeId -Tag @{Key = "map-migrated"; Value ="d-server-03jpm34ivsp1f1"} -Region $Region
         New-EC2Tag -Resource $Volume.VolumeId -Tag @{Key = 'Name' ; Value = $VolumeName} -Region $Region
         
         # Domain Controller 2 network interface tags
+        $Subnet2Name = ((Get-EC2Subnet -SubnetId ((Get-EC2Instance -InstanceId $DomainController2 -Region $Region).Instances.SubnetId) -Region $Region).Tags | Where-Object {$_.Key -eq 'Name'}).Value
+        $DomainController2Name = ((Get-EC2Instance -InstanceId $DomainController2 -Region $Region).Instances.Tags | Where-Object {$_.Key -eq 'Name'} | Select-Object -ExpandProperty Value)
         $NetworkInterface = Get-EC2NetworkInterface -Region $Region | Where-Object {$_.Attachment.InstanceId -eq $DomainController2}
-        $NetworkInterfaceName = '{0}-{1}-{2}-{3}-eni01' -f $CustomerAbbreviation, $Subnet2Name.Split('-')[1], $Subnet2Name.Split('-')[3], $Subnet2Name.Split('-')[4]
+        $NetworkInterfaceName = '{0}-{1}-{2}-{3}-{4}-eni01' -f $CustomerAbbreviation, $Subnet2Name.Split('-')[1], $Subnet2Name.Split('-')[3], $Subnet2Name.Split('-')[4], $DomainController2Name.Split('-')[-1].ToLower()
          
         New-EC2Tag -Resource $NetworkInterface.NetworkInterfaceId -Tag @{Key = "map-migrated"; Value ="d-server-03jpm34ivsp1f1"} -Region $Region
         New-EC2Tag -Resource $NetworkInterface.NetworkInterfaceId -Tag @{Key = 'Name' ; Value = $NetworkInterfaceName} -Region $Region  
         
-        $Description = 'Interface eth{0} for EC2 instance {1} ({2})' -f $NetworkInterface.Attachment.DeviceIndex, $DomainController2, ((Get-EC2Instance -InstanceId $DomainController2 -Region $Region).Instances.Tags | Where-Object {$_.Key -eq 'Name'} | Select-Object -ExpandProperty Value)
+        $Description = 'Interface eth{0} for EC2 instance {1} ({2})' -f $NetworkInterface.Attachment.DeviceIndex, $DomainController2, $DomainController2Name.ToLower() 
         Edit-EC2NetworkInterfaceAttribute -NetworkInterfaceId $NetworkInterface.NetworkInterfaceId -Description $Description
 
         # Domain Controller 2 volume tags
         $Volume = Get-EC2Volume -Filter @{Name = 'attachment.instance-id'; Values = $DomainController2} -Region $Region
-        $VolumeName = '{0}-{1}-dc01-vol01' -f $CustomerAbbreviation, $Subnet2Name.Split('-')[1]
+        $VolumeName = '{0}-{1}-{2}-vol01' -f $CustomerAbbreviation, $Subnet2Name.Split('-')[1], $DomainController2Name.Split('-')[-1].ToLower()
 
         New-EC2Tag -Resource $Volume.VolumeId -Tag @{Key = "map-migrated"; Value ="d-server-03jpm34ivsp1f1"} -Region $Region
         New-EC2Tag -Resource $Volume.VolumeId -Tag @{Key = 'Name' ; Value = $VolumeName} -Region $Region

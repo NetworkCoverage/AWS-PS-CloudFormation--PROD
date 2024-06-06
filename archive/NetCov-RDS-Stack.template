@@ -1,0 +1,992 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Transform": "AWS::LanguageExtensions",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {"default": "Customer Parameters"},
+                    "Parameters": ["CustomerAbbreviation"]
+                },
+                {
+                    "Label": {
+                        "default": "General Insatnce Parameters"
+                    },
+                    "Parameters": [
+                        "LatestAmiId",
+                        "KeypairName",
+                        "SecurityGroupId"                                               
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Network Parameters"
+                    },
+                    "Parameters": [
+                        "VpcId",
+                        "Subnet1Id",
+                        "Subnet2Id"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Active Directory Parameters"
+                    },
+                    "Parameters": [
+                        "ADServerName",
+                        "DomainAdminUsername",
+                        "DomainAdminPassword",
+                        "DomainDNSName",
+                        "DomainNetBIOSName",
+                        "LocalAdminPassword",
+                        "LocalAdminUsername"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Session Host Parameters"
+                    },
+                    "Parameters": [
+                        "SessionHostInstanceType",
+                        "SessionHostNameSuffixes"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Broker/Gateway Parameters"
+                    },
+                    "Parameters": [                        
+                        "AllocationId",
+                        "BrokerInstanceType",
+                        "BrokerServerName",
+                        "GatewayExternalFqdn"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "S3 Parameters"
+                    },
+                    "Parameters": [
+                        "S3Bucket",
+                        "S3Key"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "ADServerName": {
+                    "default": "Active Directory Server Name"
+                },                
+                "AllocationId": {
+                    "default": "Allocation Id"
+                },
+                "BrokerInstanceType": {
+                    "default": "Broker/Gateway Instance Type"
+                },
+                "BrokerServerName": {
+                    "default": "Broker/Gateway Server Name"
+                },
+                "CustomerAbbreviation": {
+                    "default": "Customer Abbreviation"
+                },
+                "DomainAdminPassword": {
+                    "default": "Domain Admin Password"
+                },
+                "DomainAdminUsername": {
+                    "default": "Domain Admin Username"
+                },
+                "DomainDNSName": {
+                    "default": "Domain DNS Name"
+                },
+                "DomainNetBIOSName": {
+                    "default": "Domain NetBIOS Name"
+                },
+                "GatewayExternalFqdn": {
+                    "default": "Gateway External Fully Qualified Domain Name"
+                },
+                "KeypairName":{
+                    "default": "Key Pair Name"
+                },
+                "LatestAmiId": {
+                    "default": "AMI ID"
+                },
+                "LocalAdminPassword": {
+                    "default": "Local Admin Password"
+                },
+                "LocalAdminUsername": {
+                    "default": "Local Admin Username"
+                },
+                "SessionHostInstanceType": {
+                    "default": "Session Host Instance Type"
+                },
+                "SessionHostNameSuffixes": {
+                    "default": "Session Host Name Suffixes"
+                },
+                "SecurityGroupId": {
+                    "default": "VPC access security group ID"
+                },
+                "Subnet1Id": {
+                    "default": "Subnet 1 Id"
+                },
+                "Subnet2Id": {
+                    "default": "Subnet 2 Id"
+                },
+                "S3Bucket": {
+                    "default": "S3 Bucket Name"
+                },
+                "S3Key": {
+                    "default": "S3 Key"
+                },
+                "VpcId": {
+                    "default": "VPC ID"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "ADServerName": {
+            "Description": "Name of an Active Directory Controller Server in the existing domain",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "AllocationId": {
+            "Description": "The allocation ID of the elastic IP address for the gateway",
+            "Type": "String"
+        },
+        "BrokerInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "t3a.large",
+            "AllowedValues": [
+                "t3a.large",
+                "t3a.xlarge",
+                "t3a.2xlarge"
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "BrokerServerName": {
+            "Description": "Name of the Remote Desktop Services broker server (up to 15 characters)",
+            "Type": "String",
+            "MaxLength": "15",
+            "MinLength": "1"
+        },
+        "CustomerAbbreviation": {
+            "AllowedPattern": "^[a-z]{2,}$",
+            "ConstraintDescription": "Customer abbreviation must have a miniumum of 2 characters",
+            "Description": "Customer abbreviation",
+            "Type": "String"
+        },
+        "DomainAdminPassword": {
+            "Description": "The password of the AD account username provided",
+            "Type": "String"
+        },
+        "DomainAdminUsername": {
+            "Description": "The username of an AD account with admin privileges",
+            "Type": "String"
+        },
+        "DomainDNSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+\\..+",
+            "Description": "DNS name of the forest root domain",
+            "MaxLength": "25",
+            "MinLength": "3",
+            "Type": "String"
+        },
+        "DomainNetBIOSName": {
+            "AllowedPattern": "[a-zA-Z0-9]+",
+            "Description": "NetBIOS name of the domain (up to 15 characters)",
+            "MaxLength": "15",
+            "MinLength": "1",
+            "Type": "String"
+        },
+        "GatewayExternalFqdn": {
+            "Description": "The external DNS Name of the gateway (e.g. rds.example.com)",
+            "Type": "String"
+        },
+        "KeypairName":{
+            "Description": "The name of the key pair to use to launch the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "LatestAmiId": {
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+            "Description": "System Manager parameter value for latest Windows Server AMI",
+            "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+        },
+        "LocalAdminPassword": {
+            "Description": "A password for the local admin account",
+            "Type": "String"
+        },
+        "LocalAdminUsername": {
+            "Description": "A username for a local admin account",
+            "Default": "nctech",
+            "Type": "String"
+        },
+        "SessionHostInstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "r6i.large",
+            "AllowedValues": [
+                "r6i.large",
+                "r6i.2xlarge",
+                "r6i.4xlarge" 
+            ],
+            "ConstraintDescription": "Must be a valid EC2 instance type."
+        },
+        "SessionHostNameSuffixes": {
+            "AllowedPattern": "^[0-9A-Za-z]*$",
+            "ConstraintDescription": "must only contain letters (uppercase and lowercase) and numbers",
+            "Description": "Comma delimited list of session host server name suffixes. E.g. if the session hosts will be named \"TEST-RDS01\" and \"TEST-RDS02\", enter \"RDS01\" and \"RDS02\". The customer abbreviation will be added as a prefix during template processing",
+            "Type": "CommaDelimitedList"
+        },
+        "S3Bucket": {
+            "Description": "Name of the S3 Bucket with the template artifacts",
+            "Type": "String"
+        },
+        "S3Key" : {
+            "Description": "Key of the S3 artifact",
+            "Type": "String"
+        },
+        "SecurityGroupId": {
+            "Description": "VPC access security group ID",
+            "Type": "AWS::EC2::SecurityGroup::Id"
+        },
+        "Subnet1Id": {
+            "Description": "ID of the subnet in the first availability zone",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "Subnet2Id": {
+            "Description": "ID of the subnet in the second availability zone",
+            "Type": "AWS::EC2::Subnet::Id"
+        },
+        "VpcId": {
+            "Description": "VPC ID",
+            "Type": "AWS::EC2::VPC::Id"
+        }
+    },
+    "Resources": {
+        "Fn::ForEach::SessionHost":[ 
+            "SessionHostNameSuffix",
+            {"Ref": "SessionHostNameSuffixes"},
+            {
+                "${SessionHostNameSuffix}": {
+                    "Type" : "AWS::EC2::Instance",
+                    "Metadata" : {
+                        "AWS::CloudFormation::Init" : {
+                            "config" : {
+                                "files": {
+                                    "c:\\cfn\\cfn-hup.conf": {
+                                        "content": {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "[main]\n",
+                                                    "stack=", {"Ref" : "AWS::StackId"}, "\n",
+                                                    "region=", {"Ref" : "AWS::Region"}, "\n"
+                                                ]
+                                            ]
+                                        }
+                                    },
+                                    "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf": {
+                                        "content": {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "[cfn-auto-reloader-hook]\n",
+                                                    "triggers=post.update\n",
+                                                    "path=Resources.", {"Ref": "SessionHostNameSuffix"}, ".Metadata.AWS::CloudFormation::Init\n",
+                                                    "action=cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r ", {"Ref": "SessionHostNameSuffix"}, " --region ", {"Ref" : "AWS::Region"}, "\n"
+                                                ]
+                                            ]
+                                        }
+                                    }
+                                },
+                                "commands" : {
+                                    "a-set-static-ip": {
+                                        "command": {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "powershell.exe -command \"",
+                                                    "$netip = Get-NetIPConfiguration; ",
+                                                    "$ipconfig = Get-NetIPAddress | ?{$_.IpAddress -eq $netip.IPv4Address.IpAddress}; ",
+                                                    "Get-NetAdapter | Set-NetIPInterface -DHCP Disabled; ",
+                                                    "Get-NetAdapter | New-NetIPAddress -AddressFamily IPv4 -IPAddress $netip.IPv4Address.IpAddress -PrefixLength $ipconfig.PrefixLength -DefaultGateway $netip.IPv4DefaultGateway.NextHop; ",
+                                                    "Get-NetAdapter | Set-DnsClientServerAddress -ServerAddresses $netip.DNSServer.ServerAddresses;\"\n"
+                                                ]
+                                            ]
+                                        },
+                                        "waitAfterCompletion": "60"
+                                    },
+                                    "b-join-domain": {
+                                        "command": {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "powershell.exe -command Add-Computer -DomainName ",
+                                                    {"Ref": "DomainDNSName"},
+                                                    " -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                                    {"Ref": "DomainNetBIOSName"},
+                                                    "\\",
+                                                    {"Ref": "DomainAdminUsername"},
+                                                    "', (ConvertTo-SecureString -String ",
+                                                    {"Ref": "DomainAdminPassword"},
+                                                    " -AsPlainText -Force))) -NewName ",
+                                                    {"Ref": "CustomerAbbreviation"}, "-", {"Ref": "SessionHostNameSuffix"},
+                                                    " -Force"
+                                                ]
+                                            ]
+                                        },
+                                        "waitAfterCompletion": "60"
+                                    },
+                                    "c-remove-windows-defender": {
+                                        "command": "powershell.exe -command Remove-WindowsFeature -Name Windows-Defender",
+                                        "waitAfterCompletion": "60"
+                                    },
+                                    "d-enable-remotefx": {
+                                        "command": "powershell.exe -command New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services' -Name 'fEnableRemoteFXAdvancedRemoteApp' -Value 0 -PropertyType DWORD -Force",
+                                        "waitAfterCompletion": "0"
+                                    },
+                                    "e-turn-off-uac": {
+                                        "command": "powershell.exe -command Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name 'ConsentPromptBehaviorAdmin' -Value 0",
+                                        "waitAfterCompletion": "0"
+                                    },
+                                    "f-turn-off-windows-firewall": {
+                                        "command": "powershell.exe -command Set-NetFirewallProfile -All -Enabled False",
+                                        "waitAfterCompletion": "0"
+                                    },
+                                    "g-enable-powershell-remoting": {
+                                        "command": "powershell.exe -command Enable-PSRemoting",
+                                        "waitAfterCompletion": "0"
+                                    },
+                                    "h-enable-credssp-server": {
+                                        "command": "powershell.exe -command Enable-WSManCredSSP -Role Server -Force",
+                                        "waitAfterCompletion": "0"
+                                    },
+                                    "i-rename-local-admin": {
+                                        "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUsername"}]]},
+                                        "waitAfterCompletion": "0"
+                                    },
+                                    "j-reset-local-admin-pw": {
+                                        "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUsername"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
+                                        "waitAfterCompletion": "0"
+                                    },
+                                    "k-restart-computer": {
+                                        "command": "powershell.exe -command Restart-Computer",
+                                        "waitAfterCompletion": "forever"
+                                    },
+                                    "l-signal-success" : { 
+                                        "command" : { "Fn::Join" : ["", ["cfn-signal.exe --stack ", {"Ref" : "AWS::StackId"}, " --resource ", {"Ref": "SessionHostNameSuffix"}," --region ", {"Ref" : "AWS::Region"}]]}
+                                    }
+                                        
+                                },
+                                "services": {
+                                    "windows": {
+                                        "cfn-hup": {
+                                            "enabled": "true",
+                                            "ensureRunning": "true",
+                                            "files": [
+                                                "c:\\cfn\\cfn-hup.conf",
+                                                "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "Properties" : {
+                        "BlockDeviceMappings": [
+                            {
+                                "DeviceName": "/dev/sda1",
+                                "Ebs": {"VolumeSize": "100", "VolumeType": "gp3"}
+                            }
+                        ],
+                        "ImageId": {"Ref": "LatestAmiId"},
+                        "InstanceType": {"Ref": "SessionHostInstanceType"},
+                        "KeyName": {"Ref": "KeypairName"},
+                        "Monitoring" : "true",
+                        "SecurityGroupIds" : [{"Ref":"SecurityGroupId"}],
+                        "SubnetId": {"Ref": "Subnet1Id"},
+                        "Tags": [
+                            {"Key": "Name", "Value": {"Fn::Join": ["", [{"Ref": "CustomerAbbreviation"}, "-", {"Ref": "SessionHostNameSuffix"}]]}},
+                            {"Key": "map-migrated", "Value": "d-server-03jpm34ivsp1f1"}                    
+                        ], 
+                        "UserData": { 
+                            "Fn::Base64" : { 
+                                "Fn::Join" : [
+                                    "", 
+                                    [
+                                        "<script>\n",                  
+                                        "cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r ", {"Ref": "SessionHostNameSuffix"}," --region ", {"Ref" : "AWS::Region"}, "\n",
+                                        "</script>"       
+                                    ]
+                                ]
+                            }
+                        }
+                    },
+                    "CreationPolicy" : {
+                        "ResourceSignal" : {
+                            "Timeout" : "PT60M"
+                        }
+                    }
+                }                
+            }
+        ],
+        "SslSecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Allows HTTP and HTTPS access for SSL certificate maintenance",
+                "GroupName" : "ssl certificate security group",
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 80,
+                        "ToPort" : 80,
+                        "CidrIp" : "0.0.0.0/0"
+                    },
+                    {
+                        "IpProtocol" : "tcp",
+                        "FromPort" : 443,
+                        "ToPort" : 443,
+                        "CidrIp" : "0.0.0.0/0"
+                    }  
+                ],
+                "Tags": [{"Key": "map-migrated", "Value":"d-server-03jpm34ivsp1f1"}],
+                "VpcId": {"Ref": "VpcId"}
+            }
+        },
+        "Broker": {
+            "Type" : "AWS::EC2::Instance",
+            "Metadata" : {
+                "AWS::CloudFormation::Init" : {
+                    "configSets": {
+                        "config": [
+                            "setup",
+                            "waitforsessionhost",
+							"deployrds",
+                            "finalize"
+                        ]
+                    },
+                    "setup": {
+                        "files": {
+                            "c:\\cfn\\cfn-hup.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[main]\n",
+                                            "stack=", {"Ref" : "AWS::StackId"}, "\n",
+                                            "region=", {"Ref" : "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "[cfn-auto-reloader-hook]\n",
+                                            "triggers=post.update\n",
+                                            "path=Resources.Broker.Metadata.AWS::CloudFormation::Init\n",
+                                            "action=cfn-init.exe -v -s ", {"Ref" : "AWS::StackId"}, " -r Broker", " --region ", {"Ref" : "AWS::Region"}, "\n"
+                                        ]
+                                    ]
+                                }
+                            }                            
+                        },
+                        "commands": {
+                            "a-set-static-ip": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command \"",
+                                            "$netip = Get-NetIPConfiguration; ",
+                                            "$ipconfig = Get-NetIPAddress | ?{$_.IpAddress -eq $netip.IPv4Address.IpAddress}; ",
+                                            "Get-NetAdapter | Set-NetIPInterface -DHCP Disabled; ",
+                                            "Get-NetAdapter | New-NetIPAddress -AddressFamily IPv4 -IPAddress $netip.IPv4Address.IpAddress -PrefixLength $ipconfig.PrefixLength -DefaultGateway $netip.IPv4DefaultGateway.NextHop; ",
+                                            "Get-NetAdapter | Set-DnsClientServerAddress -ServerAddresses $netip.DNSServer.ServerAddresses;\"\n"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "b-join-domain": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Add-Computer -DomainName ",
+                                            {"Ref": "DomainDNSName"},
+                                            " -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOSName"},
+                                            "\\",
+                                            {"Ref": "DomainAdminUsername"},
+                                            "', (ConvertTo-SecureString -String ",
+                                            {"Ref": "DomainAdminPassword"},
+                                            " -AsPlainText -Force))) -NewName ",
+                                            {"Ref": "BrokerServerName"},
+                                            " -Force"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "c-remove-windows-defender": {
+                                "command": "powershell.exe -command Remove-WindowsFeature -Name Windows-Defender",
+                                "waitAfterCompletion": "60"
+                            },
+                            "d-enable-remotefx": {
+                                "command": "powershell.exe -command New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows NT\\Terminal Services' -Name 'fEnableRemoteFXAdvancedRemoteApp' -Value 0 -PropertyType DWORD -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "e-turn-off-uac": {
+                                "command": "powershell.exe -command Set-ItemProperty -Path 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Policies\\System' -Name 'ConsentPromptBehaviorAdmin' -Value 0",
+                                "waitAfterCompletion": "0"
+                            },
+                            "f-turn-off-windows-firewall": {
+                                "command": "powershell.exe -command Set-NetFirewallProfile -All -Enabled False",
+                                "waitAfterCompletion": "0"
+                            },                            
+                            "g-enable-powershell-remoting": {
+                                "command": "powershell.exe -command Enable-PSRemoting",
+                                "waitAfterCompletion": "0"
+                            },
+                            "h-enable-credssp-server": {
+                                "command": "powershell.exe -command Enable-WSManCredSSP -Role Server -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "i-enable-credssp-client": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Enable-WSManCredSSP -Role Client -DelegateComputer '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Force"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "j-enable-credssp-registry": {
+                                "command": {
+                                    "Fn::Join": [   
+                                        "",
+                                        [
+                                            "powershell.exe -command \"",
+                                            "New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CredentialsDelegation' -Name AllowFreshCredentialsWhenNTLMOnly -Value 1 -PropertyType Dword -Force; ",
+                                            "New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CredentialsDelegation' -Name ConcatenateDefaults_AllowFreshNTLMOnly -Value 1 -PropertyType Dword -Force; ",
+                                            "New-Item -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CredentialsDelegation\\AllowFreshCredentialsWhenNTLMOnly' -Force; ",
+                                            "New-ItemProperty -Path 'HKLM:\\SOFTWARE\\Policies\\Microsoft\\Windows\\CredentialsDelegation\\AllowFreshCredentialsWhenNTLMOnly' -Name 1 -Value 'WSMAN/",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -PropertyType String -Force;\"\n"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "0"
+                            },
+                            "k-install-package-provider": {
+                                "command": "powershell.exe -command Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "l-install-powershellget": {
+                                "command": "powershell.exe -command Install-Module -Name PowerShellGet -Force",
+                                "waitAfterCompletion": "0"
+                            },
+                            "m-install-rdwebclientmanagement": {
+                                "command": "powershell.exe -command Install-Module -Name RDWebClientManagement -Force -AcceptLicense",
+                                "waitAfterCompletion": "0"
+                            },
+                            "n-rename-local-admin": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Rename-LocalUser Administrator -NewName ", {"Ref": "LocalAdminUsername"}]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "o-reset-local-admin-pw": {
+                                "command": {"Fn::Join": ["", ["powershell.exe -command Set-LocalUser ", {"Ref": "LocalAdminUsername"}, " -Password (ConvertTo-SecureString -String '", {"Ref": "LocalAdminPassword"}, "' -AsPlainText -Force)"]]},
+                                "waitAfterCompletion": "0"
+                            },
+                            "p-restart-computer": {
+                                "command": "powershell.exe -command Restart-Computer",
+                                "waitAfterCompletion": "forever"
+                            }                            
+                        },
+                        "services": {
+                            "windows": {
+                                "cfn-hup": {
+                                    "enabled": "true",
+                                    "ensureRunning": "true",
+                                    "files": [
+                                        "c:\\cfn\\cfn-hup.conf",
+                                        "c:\\cfn\\hooks.d\\cfn-auto-reloader.conf"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "waitforsessionhost": {
+                        "commands": {
+                            "a-wait": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command \"",
+                                            "$List = ; ",
+                                            "$Names = $List | ForEach-Object -Process {'{0}-{1}' -f '",{"Ref": "CustomerAbbreviation"},"', $_}; ",
+                                            "Invoke-Command -ScriptBlock {",
+                                            "$Signal = $false; ",
+                                            "do {",
+                                            "$Rds = @(); ",
+                                            "$Rds = $Using:Names | % {Get-ADComputer -Identity $_}; ",
+                                            "if ($Rds.Count -eq $Using:Names.Count) {",
+                                            "('{0}/{1}' -f $Rds.Count, $Using:Names.Count); ",
+                                            "$Signal = $true} ",
+                                            "else {",
+                                            "('{0}/{1}' -f $Rds.Count, $Using:Names.Count); ",
+                                            "Start-Sleep 300}} ",
+                                            "until ($Signal)} -ComputerName ",
+                                            {"Ref":"ADServerName"},
+                                            " -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOSName"},
+                                            "\\",
+                                            {"Ref": "DomainAdminUsername"},
+                                            "', (ConvertTo-SecureString -String '",
+                                            {"Ref": "DomainAdminPassword"},
+                                            "' -AsPlainText -Force)));\"\n"
+                                        ]
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "deployrds": {
+                        "files": {
+                            "c:\\cfn\\win-acme.zip": {
+                                "source": {
+                                    "Fn::Join": [
+                                        "/",
+                                        [
+                                            "https://s3.amazonaws.com",
+                                            {"Ref": "S3Bucket"},
+                                            {"Ref": "S3Key"}
+                                        ]
+                                    ]
+                                }
+                            }
+                        },
+                        "commands": {
+                            "a-create-rds-deployment": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [  
+                                            "powershell.exe -command Invoke-Command -ScriptBlock {New-RDSessionDeployment -ConnectionBroker '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "'  -WebAccessServer  '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "'  -SessionHost '",
+                                            {"Ref": "SessionHostNameSuffixes"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "'} -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOSName"},
+                                            "\\",
+                                            {"Ref": "DomainAdminUsername"},
+                                            "', (ConvertTo-SecureString -String '",
+                                            {"Ref": "DomainAdminPassword"},
+                                            "' -AsPlainText -Force))) -ComputerName '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Authentication Credssp"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "60"
+                            },
+                            "b-install-gateway-feature": {
+                                "command": "powershell.exe -command Install-WindowsFeature -Name RDS-Gateway -IncludeManagementTools",
+                                "waitAfterCompletion": "30"                           
+                            },
+                            "c-add-gateway-server": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Add-RDServer -Server '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Role 'RDS-GATEWAY' -ConnectionBroker '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -GatewayExternalFqdn '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "'"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "30"
+                            },
+                            "d-add-licensing-server": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Add-RDServer -Server '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Role 'RDS-LICENSING' -ConnectionBroker '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "'"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "0"
+                            },
+                            "e-set-license-configuration": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Set-RDLicenseConfiguration -LicenseServer '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Mode PerUser -ConnectionBroker '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Force"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "0"
+                            },
+                            "f-activate-license-server":{
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command $wmiClass = ([wmiclass]'\\\\localhost\\root\\cimv2:Win32_TSLicenseServer'); ",
+                                            "$wmiTSLicenseObject = Get-WMIObject Win32_TSLicenseServer; ",
+                                            "$wmiTSLicenseObject.FirstName = 'Test'; ",
+                                            "$wmiTSLicenseObject.LastName = 'Inc'; ",
+                                            "$wmiTSLicenseObject.Company = 'Test Inc'; ",
+                                            "$wmiTSLicenseObject.CountryRegion = 'United States'; ",
+                                            "$wmiTSLicenseObject.Put(); ",
+                                            "$wmiClass.ActivateServerAutomatic(); ",
+                                            "$wmiClass.GetActivationStatus().ActivationStatus; ",
+                                            "Write-Host '(0 = activated, 1 = not activated)';\n"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "g-add-license-server-to-ad": {
+                                "command" :{
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Invoke-Command -ScriptBlock {Add-ADGroupMember -Identity 'Terminal Server License Servers' -Members (Get-ADComputer -Identity '", 
+                                            {"Ref": "BrokerServerName"},
+                                            "')} -ComputerName '",
+                                            {"Ref": "ADServerName"},
+                                            "' -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOSName"},
+                                            "\\",
+                                            {"Ref": "DomainAdminUsername"},
+                                            "', (ConvertTo-SecureString -String '",
+                                            {"Ref": "DomainAdminPassword"},
+                                            "' -AsPlainText -Force)))"
+                                        ]
+                                    ]
+                                }
+                            },
+                            "h-install-rdwebclientpackage": {
+                                "command": "powershell.exe -command Install-RDWebClientPackage",
+                                "waitAfterCompletion": "0"
+                            },
+                            "i-unpack-winacme-module": {
+                                "command": "powershell.exe -command Expand-Archive -Path 'c:\\cfn\\win-acme.zip' -DestinationPath 'c:\\cfn\\win-acme\\' -Force",
+								"waitAfterCompletion": "0"
+                            },
+                            "j-generate-ssl-cert": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "c:\\cfn\\win-acme\\wacs.exe --source manual --host ",
+                                            {"Ref": "GatewayExternalFqdn"},
+                                            " --certificatestore My --installation iis,script --installationsiteid 1 --script \"C:\\cfn\\win-acme\\Scripts\\ImportRDSFull.ps1\" --scriptparameters \"{CertThumbprint}\" --emailaddress support@netcov.com --accepttos"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "0"
+                            },
+                            "k-new-rds-collection": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Invoke-Command -ScriptBlock {$SessionHostNames = ", 
+                                            {"Ref": "SessionHostNames"}, 
+                                            " | ForEach-Object {'{0}.{1}' -f $_, '", 
+                                            {"Ref": "DomainDNSName"},
+                                            "'}; New-RDSessionCollection -CollectionName 'RemoteApps' -CollectionDescription 'Session collection for remote applications and desktops' -SessionHost $SessionHostNames} -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOSName"},
+                                            "\\",
+                                            {"Ref": "DomainAdminUsername"},
+                                            "', (ConvertTo-SecureString -String '",
+                                            {"Ref": "DomainAdminPassword"},
+                                            "' -AsPlainText -Force))) -ComputerName '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Authentication Credssp"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "0"
+                            },
+                            "l-set-rds-collection": {
+                                "command": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command Invoke-Command -ScriptBlock {Set-RDSessionCollectionConfiguration -CollectionName 'RemoteApps' -ClientDeviceRedirectionOptions TimeZone -MaxRedirectedMonitors 16 -ClientPrinterRedirected $false -TemporaryFoldersPerSession $true -BrokenConnectionAction Disconnect -TemporaryFoldersDeletedOnExit $true -AutomaticReconnectionEnabled $true -ActiveSessionLimitMin 960 -DisconnectedSessionLimitMin 5 -IdleSessionLimitMin 480 -AuthenticateUsingNLA $true -EncryptionLevel High -SecurityLayer Negotiate -ConnectionBroker '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "'} -Credential (New-Object -TypeName pscredential -ArgumentList ('",
+                                            {"Ref": "DomainNetBIOSName"},
+                                            "\\",
+                                            {"Ref": "DomainAdminUsername"},
+                                            "', (ConvertTo-SecureString -String '",
+                                            {"Ref": "DomainAdminPassword"},
+                                            "' -AsPlainText -Force))) -ComputerName '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "' -Authentication Credssp"
+                                        ]
+                                    ]
+                                },
+                                "waitAfterCompletion": "0"
+                            }                         
+                        }
+                    },
+                    "finalize": {
+                        "files": {
+                            "c:\\cfn\\configureservermanager.bat": {
+                                "content": {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            "powershell.exe -command \"Start-Process $env:windir\\system32\\ServerManager.exe; Start-Sleep 5; ",
+                                            "if ((Get-Process).ProcessName -contains 'ServerManager') {Get-Process ServerManager | Stop-Process -Force}; ",
+                                            "$file = Get-Item $env:USERPROFILE\\AppData\\Roaming\\Microsoft\\Windows\\ServerManager\\ServerList.xml; ",
+                                            "Copy-Item -Path $file.FullName -Destination $file-backup -Force; ",
+                                            "$xml = [xml] (Get-Content $file); ",
+                                            "$newserver = @($xml.ServerList.ServerInfo)[0].clone(); ",
+                                            "$newserver.Name = '",
+                                            {"Ref": "BrokerServerName"},
+                                            ".",
+                                            {"Ref": "DomainDNSName"},
+                                            "'; ",
+                                            "$newserver.LastUpdateTime = '0001-01-01T00:00:00'; ",
+                                            "$newserver.Status = '2'; ",
+                                            "$xml.ServerList.AppendChild($newserver); ",
+                                            "$xml.Save($file.FullName); Start-Process $env:windir\\system32\\ServerManager.exe;\"\n"
+                                        ]
+                                    ]
+                                }
+                            }
+                        },                       
+                        "commands": {
+                            "a-publish-rdwebclientpackage": {
+                                "command": "powershell.exe -command Publish-RDWebClientPackage -Type Production -Latest",
+                                "waitAfterCompletion": "0"
+                            },
+                            "b-add-run-once": {
+                                "command": "powershell.exe -command New-Item -Path HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce -Force",
+                                "waitAfterCompletion" : "0"
+                            },
+                            "c-configure-run-once": {
+                                "command": "powershell.exe -command New-ItemProperty -Path HKCU:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\RunOnce -Name ConfigureServerManager -Value \"c:\\cfn\\temp\\configureservermanager.bat\"",
+                                "waitAfterCompletion" : "0"
+                            },
+                            "d-signal-success" : { 
+                                "command" : { "Fn::Join" : ["", ["cfn-signal.exe -e 0 \"", {"Fn::Base64": {"Ref": "BrokerWaitHandle"}},"\""]]}
+                            }
+                        }
+                    }
+                }
+            },
+            "Properties" : {
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {"VolumeSize": "100", "VolumeType": "gp3"}
+                    }
+                ],
+                "ImageId": {"Ref": "LatestAmiId"},
+                "InstanceType": {"Ref": "BrokerInstanceType"},
+                "KeyName": {"Ref": "KeypairName"},
+                "SecurityGroupIds" : [{"Ref": "SecurityGroupId"}, {"Ref": "SslSecurityGroup"}],
+                "SubnetId": {"Ref": "Subnet2Id"},
+                "Tags": [
+                    {"Key": "Name", "Value": {"Ref": "BrokerServerName"}},
+                    {"Key": "map-migrated", "Value": "d-server-03jpm34ivsp1f1"}                    
+                ], 
+                "UserData": { 
+                    "Fn::Base64" : { 
+                        "Fn::Join" : [
+                            "", 
+                            [
+                                "<script>\n",                  
+                                "cfn-init.exe -v -c config -s ", {"Ref" : "AWS::StackId"}, " -r Broker ", " --region ", {"Ref" : "AWS::Region"}, "\n",        
+                                "</script>"          
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "BrokerWaitHandle": {
+            "Type": "AWS::CloudFormation::WaitConditionHandle"
+        },
+        "BrokerWaitCondition": {
+            "Type": "AWS::CloudFormation::WaitCondition",
+            "DependsOn": "Broker",
+            "Properties": {
+                "Handle": {"Ref": "BrokerWaitHandle"},
+                "Timeout": "4500"
+            }
+        }, 
+        "GatewayEIPAssociation": {
+            "Type" : "AWS::EC2::EIPAssociation",
+            "Properties" : {
+                "AllocationId" : {"Ref": "AllocationId"},
+                "InstanceId" : {"Ref": "Broker"}
+              }
+        }      
+    },
+    "Outputs": {
+        
+    }
+}

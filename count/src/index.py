@@ -29,7 +29,7 @@ def update_placeholder(resource_structure, iteration):
     resourceString = json.dumps(resource_structure)
     
     # Define a regular expression pattern to find string formatting operators for digits
-    pattern = r'%\d*d'
+    pattern = r'%(\d*)d'
     
     # Find all occurrences of the pattern in the string
     placeholders = re.findall(pattern, resourceString)
@@ -38,7 +38,8 @@ def update_placeholder(resource_structure, iteration):
     if placeholders:
         print("Found {} occurrences of digit placeholders in JSON, replacing with iterator value {}".format(len(placeholders), iteration))
         for placeholder in placeholders:
-            resourceString = resourceString.replace(placeholder, str(iteration).zfill(int(placeholder[2:-1])))
+            placeholder_value = str(iteration).zfill(int(placeholder)) if placeholder else str(iteration)
+            resourceString = resourceString.replace('%{}d'.format(placeholder), placeholder_value)
         # Convert the string back to json and return it
         return json.loads(resourceString)
     else:

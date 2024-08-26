@@ -547,11 +547,77 @@ New-CFNStack @CFNStack
 
 
 
-$AllocationId = 'eipalloc-0b6905971005d20b5'
+
+$AllocationId = 'eipalloc-040dcf4c5c1a8ee4f'
+$BrokerServerName = 'NC-BK51'
+$CreateTransitGateway = 'false'
+$CustomerAbbreviation = 'test'
+$GatewayExternalFqdn = 'rdpfarm.netcov.com'
+$Region = 'us-east-1'
+$SessionHostNames = 'NC-RDS51,NC-RDS52,NC-RDS53'
+$Server1Ip = '10.55.0.5'
+$Server1Name = 'NC-AD51'
+$Server2Ip = '10.55.1.5'
+$Server2Name = 'NC-AD52'
+$Subnet1Cidr = '10.55.0.0/24'
+$Subnet2Cidr = '10.55.1.0/24'
+$VpcCidr = '10.55.0.0/16'
+
+$Parameter = @(
+    @{ParameterKey = 'AdInstanceType'; ParameterValue = 't3a.large'},
+    @{ParameterKey = 'AdNamingS3Key'; ParameterValue = 'ad-stack-naming.zip'},
+    @{ParameterKey = 'ADServer1Ip'; ParameterValue = '192.168.6.5'},
+    @{ParameterKey = 'ADServer2Ip'; ParameterValue = ''},
+    @{ParameterKey = 'ADServerName'; ParameterValue = 'TEST-DC01'},
+    @{ParameterKey = 'AllocationId'; ParameterValue = $AllocationId},
+    @{ParameterKey = 'BrokerInstanceType'; ParameterValue = 't3a.xlarge'},
+    @{ParameterKey = 'BrokerNamingS3Key'; ParameterValue = 'bk-stack-naming.zip'},
+    @{ParameterKey = 'BrokerServerName'; ParameterValue = $BrokerServerName},
+    @{ParameterKey = 'CustomerAbbreviation'; ParameterValue = $CustomerAbbreviation},
+    @{ParameterKey = 'CustomerGatewayIpAddress'; ParameterValue = '38.122.194.242'},
+    @{ParameterKey = 'CreateTransitGateway'; ParameterValue = $CreateTransitGateway},
+    @{ParameterKey = 'DomainAdminPassword'; ParameterValue = 'f@ncyCar53'},
+    @{ParameterKey = 'DomainAdminUserName'; ParameterValue = 'Administrator'},
+    @{ParameterKey = 'DomainDNSName'; ParameterValue = 'corp.test.com'},
+    @{ParameterKey = 'DomainNetBIOSName'; ParameterValue = 'TEST'},
+    @{ParameterKey = 'GatewayExternalFqdn'; ParameterValue = $GatewayExternalFqdn},
+    @{ParameterKey = 'LatestAmiId'; ParameterValue = '/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base'},
+    @{ParameterKey = 'LocalAdminPassword'; ParameterValue = 'darkD!me83'},
+    @{ParameterKey = 'LocalAdminUserName'; ParameterValue = 'nctech'},
+    @{ParameterKey = 'S3Bucket'; ParameterValue = ('netcov-set-devtest1-internal-{0}' -f $Region)},
+    @{ParameterKey = 'Server1Ip'; ParameterValue = $Server1Ip},
+    @{ParameterKey = 'Server1Name'; ParameterValue = $Server1Name},
+    @{ParameterKey = 'Server2Ip'; ParameterValue = $Server2Ip},
+    @{ParameterKey = 'Server2Name'; ParameterValue = $Server2Name},
+    @{ParameterKey = 'SessionHostInstanceType'; ParameterValue = 'r6i.large'},
+    @{ParameterKey = 'SessionHostNames'; ParameterValue = $SessionHostNames},
+    @{ParameterKey = 'SessionHostNamingS3Key'; ParameterValue = 'sh-stack-naming.zip'},
+    @{ParameterKey = 'Subnet1Cidr'; ParameterValue = $Subnet1Cidr},
+    @{ParameterKey = 'Subnet2Cidr'; ParameterValue = $Subnet2Cidr},
+    @{ParameterKey = 'VpcCidr'; ParameterValue = $VpcCidr},
+    @{ParameterKey = 'VpcHelperS3Key'; ParameterValue = 'vpc-stack-helper.zip'},
+    @{ParameterKey = 'VpcNamingS3Key'; ParameterValue = 'vpc-stack-naming.zip'},
+    @{ParameterKey = 'VpnDestinationCidr'; ParameterValue = '192.168.6.0/24'}
+    @{ParameterKey = 'WinAcmeS3Key'; ParameterValue = 'win-acme.v2.2.4.1500.x64.pluggable.zip'}
+)
+$CFNStack = @{
+    StackName = 'Stack-NetCov'
+    Capability = 'CAPABILITY_IAM', 'CAPABILITY_AUTO_EXPAND'
+    DisableRollback = $true
+    Parameter = $Parameter
+    TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-VPC-AD-RDS-Main-Stack.template' 
+    Region = $Region
+    ProfileName = 'set-devtest2-internal'
+}
+New-CFNStack @CFNStack 
+
+
+
+$AllocationId = 'eipalloc-0576a7f7b5c35be19' #'eipalloc-0b6905971005d20b5'
 $BrokerServerName = 'MYS-BK01'
 $CreateTransitGateway = 'false'
 $CustomerAbbreviation = 'test'
-$GatewayExternalFqdn = 'rds.netcov.com'
+$GatewayExternalFqdn = 'rds-uw2.netcov.com' #'rds.netcov.com'
 $Region = 'us-west-2'
 $SessionHostNames = 'TEST-RDS01,TEST-RDS02,TEST-RDS03'
 $Server1Ip = '10.1.0.5'
@@ -606,18 +672,16 @@ $CFNStack = @{
     Parameter = $Parameter
     TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-VPC-AD-RDS-Main-Stack.template' 
     Region = $Region
-    ProfileName = 'set-devtest1-internal'
+    ProfileName = 'set-devtest2-internal'
 }
 New-CFNStack @CFNStack 
 
 
-
-
-$AllocationId = 'eipalloc-0677ff15ab16e1f5c'
+$AllocationId = 'eipalloc-01552f463f75840eb' #'eipalloc-050c322a603a72992'
 $BrokerServerName = 'NCI-GW05'
 $CreateTransitGateway = 'true'
 $CustomerAbbreviation = 'nci'
-$GatewayExternalFqdn = 'remote.netcov.com'
+$GatewayExternalFqdn = 'remote-use2.netcov.com' #'remote.netcov.com'
 $Region = 'us-east-2'
 $SessionHostNames = 'NCI-RDS10,NCI-RDS11,NCI-TL04'
 $Server1Ip = '10.0.0.5'
@@ -672,16 +736,16 @@ $CFNStack = @{
     Parameter = $Parameter
     TemplateURL = 'https://netcov-set-devtest1-internal-us-west-1.s3.us-west-1.amazonaws.com/NetCov-VPC-AD-RDS-Main-Stack.template' 
     Region = $Region
-    ProfileName = 'set-devtest1-internal'
+    ProfileName = 'set-devtest2-internal'
 }
 New-CFNStack @CFNStack 
 
 
-$AllocationId = 'eipalloc-01b4b0b170f7d457b'
+$AllocationId = <# 'eipalloc-040d7c9bbd5eaa4e8' #> 'eipalloc-01b4b0b170f7d457b'
 $BrokerServerName = 'NCI-GW15'
 $CreateTransitGateway = 'false'
 $CustomerAbbreviation = 'nci'
-$GatewayExternalFqdn = 'rdp.netcov.com'
+$GatewayExternalFqdn = <# 'rdp-uw1.netcov.com' #> 'rdp.netcov.com'
 $Region = 'us-west-1'
 $SessionHostNames = 'NCI-RDS30,NCI-RDS31,NCI-TL34'
 $Server1Ip = '10.44.0.5'
@@ -727,7 +791,7 @@ $Parameter = @(
     @{ParameterKey = 'VpcHelperS3Key'; ParameterValue = 'vpc-stack-helper.zip'},
     @{ParameterKey = 'VpcNamingS3Key'; ParameterValue = 'vpc-stack-naming.zip'},
     @{ParameterKey = 'VpnDestinationCidr'; ParameterValue = '192.168.6.0/24'}
-    @{ParameterKey = 'WinAcmeS3Key'; ParameterValue = 'win-acme.v2.2.9.1701.x64.pluggable.zip'}
+    @{ParameterKey = 'WinAcmeS3Key'; ParameterValue = 'win-acme.v2.2.4.1500.x64.pluggable.zip'}
 )
 $CFNStack = @{
     StackName = 'Stack-NetCov'
@@ -738,4 +802,4 @@ $CFNStack = @{
     Region = $Region
     ProfileName = 'set-devtest1-internal'
 }
-New-CFNStack @CFNStack 
+New-CFNStack @CFNStack

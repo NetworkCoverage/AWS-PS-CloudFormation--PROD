@@ -143,12 +143,12 @@
         },
         "LocalAdminPassword": {
             "Description": "A password for the local admin account",
+            "NoEcho":"true",
             "Type": "String"
         },
         "LocalAdminUserName": {
             "Description": "A username for a local admin account",
             "Default": "nctech",
-            "NoEcho":"true",
             "Type": "String"
         },
         "S3Bucket": {

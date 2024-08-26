@@ -1,0 +1,1136 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Parameters": [
+                        "CustomerName",
+                        "KeyName",
+                        "VpcId",
+                        "AdminPassword",
+                        "SubnetID",
+                        "SourceLocationSSH",
+                        "SourceLocation443",
+                        "SourceLocation8443",
+                        "UdpTcpSpaEnabled",
+                        "UserData",
+                        "InstanceType",
+                        "AllocateElasticIP"
+                    ]
+                }
+            ]
+        }
+    },
+    "Mappings": {
+        "AWSRegionToAMI": {
+            "us-east-1": {
+                "AMIID": "ami-0709e1d9de5ef734e"
+            },
+            "us-east-2": {
+                "AMIID": "ami-026c1a4e2e1effee0"
+            },
+            "us-west-1": {
+                "AMIID": "ami-0cf24b22a291b683b"
+            },
+            "us-west-2": {
+                "AMIID": "ami-02e2984f61ec72063"
+            },
+            "ca-central-1": {
+                "AMIID": "ami-0ff29da4242f20348"
+            },
+            "eu-central-1": {
+                "AMIID": "ami-026671c41072be454"
+            },
+            "eu-central-2": {
+                "AMIID": "ami-09692009967f5d797"
+            },
+            "eu-west-1": {
+                "AMIID": "ami-07cadacc6753ab12e"
+            },
+            "eu-west-2": {
+                "AMIID": "ami-07fadb02c06400c97"
+            },
+            "eu-west-3": {
+                "AMIID": "ami-0f768a42f0fe86756"
+            },
+            "ap-southeast-1": {
+                "AMIID": "ami-0e6670178cbe969ed"
+            },
+            "ap-southeast-2": {
+                "AMIID": "ami-0143c3da2fea633d5"
+            },
+            "ap-southeast-3": {
+                "AMIID": "ami-05ef0ef7813d122f8"
+            },
+            "ap-southeast-4": {
+                "AMIID": "ami-0b55b016a0e2321db"
+            },
+            "ap-south-1": {
+                "AMIID": "ami-0c31f95a367b89058"
+            },
+            "ap-south-2": {
+                "AMIID": "ami-0981b1a376c10637b"
+            },
+            "ap-northeast-1": {
+                "AMIID": "ami-09431c2fbccddf87d"
+            },
+            "ap-northeast-2": {
+                "AMIID": "ami-0131ead87e6d77eac"
+            },
+            "ap-northeast-3": {
+                "AMIID": "ami-01c6350079a7a28df"
+            },
+            "sa-east-1": {
+                "AMIID": "ami-076da40309ce08243"
+            },
+            "ap-east-1": {
+                "AMIID": "ami-06a5ed781ad950fc1"
+            },
+            "me-south-1": {
+                "AMIID": "ami-065ac6e9ce99e14f4"
+            },
+            "me-central-1": {
+                "AMIID": "ami-03d2987ec2ed36981"
+            },
+            "af-south-1": {
+                "AMIID": "ami-0db885c2a3f3c69a1"
+            },
+            "eu-north-1": {
+                "AMIID": "ami-01273b007031f1575"
+            },
+            "eu-south-1": {
+                "AMIID": "ami-0fa6af9ef3863c9cb"
+            },
+            "eu-south-2": {
+                "AMIID": "ami-0ddb77e833e9b44c0"
+            }
+        }
+    },
+    "Resources": {
+        "ApplianceUdpSpaEnabled": {
+            "Type": "AWS::EC2::Instance",
+            "Condition": "UdpTcpSpaIsEnabled",
+            "Properties": {
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSRegionToAMI",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "AMIID"
+                    ]
+                },
+                "InstanceType": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::Split": [
+                                " ",
+                                {
+                                    "Ref": "InstanceType"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetID"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "EcsSecurityGroupUdpSpaEnabled"
+                    }
+                ],
+                "IamInstanceProfile": {
+                    "Ref": "IAMProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "\n",
+                            [
+                                "#!/bin/bash",
+                                "adminPassword=Password1",
+                                "profileHostname=\"sdp-controllers.mydomain.com\"",
+                                "publicHostname=$(curl --silent http://169.254.169.254/latest/meta-data/public-hostname)",
+                                "",
+                                "cz-seed \\",
+                                "    --dhcp-ipv4 eth0 \\",
+                                "    --profile-hostname \"$profileHostname\" \\",
+                                "    --hostname \"$publicHostname\" \\",
+                                "    --admin-hostname \"$publicHostname\" \\",
+                                "    --ntp-server 169.254.169.123 \\",
+                                "    --admin-password $adminPassword > /home/cz/seed.json",
+                                "",
+                                "cat << 'E0F' > /home/cz/post-install.sh",
+                                "#!/bin/bash",
+                                "if [[ $(sudo cz-config status | jq -r .roles.controller.status) == \"healthy\" ]]; then",
+                                "   publicHostname=$(curl --silent http://169.254.169.254/latest/meta-data/public-hostname)",
+                                "   response=$(curl --insecure --location --request POST \"https://$publicHostname:8443/admin/login\" \\",
+                                "   --header \"Content-Type: application/json\" \\",
+                                "   --header \"Accept: application/vnd.appgate.peer-v19+json\" \\",
+                                "   --data '{",
+                                "       \"providerName\": \"local\",",
+                                "       \"username\": \"admin\",",
+                                "       \"password\": \"Password1\",",
+                                "       \"deviceId\": \"4c07bc67-57ea-42dd-b702-c2d6c45419fd\"",
+                                "   }')",
+                                "",
+                                "   token=$(echo $response | jq -r '.token')",
+                                "",
+                                "   # identity provider",
+                                "   curl --insecure --location --request POST \"https://$publicHostname:8443/admin/identity-providers\" \\",
+                                "   --header \"Content-Type: application/json\" \\",
+                                "   --header \"Accept: application/vnd.appgate.peer-v19+json\" \\",
+                                "   --header \"Authorization: Bearer $token\" \\",
+                                "   --data '{",
+                                "       \"name\": \"CustomerName Admin\",",
+                                "       \"notes\": \"CustomerName Admin SAML IDP\",",
+                                "       \"tags\": [",
+                                "           \"CustomerName\"",
+                                "       ],",
+                                "       \"adminProvider\": true,",
+                                "       \"type\": \"Saml\",",
+                                "       \"enforceWindowsNetworkProfileAsDomain\": false,",
+                                "       \"claimMappings\": [",
+                                "           {",
+                                "               \"attributeName\": \"http://schemas.microsoft.com/ws/2008/06/identity/claims/groups\",",
+                                "               \"claimName\": \"cg_CustomerName\",",
+                                "               \"list\": true,",
+                                "               \"encrypt\": false",
+                                "           },",
+                                "           {",
+                                "               \"attributeName\": \"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress\",",
+                                "               \"claimName\": \"email\",",
+                                "               \"list\": false,",
+                                "               \"encrypt\": false",
+                                "           },",
+                                "           {",
+                                "               \"attributeName\": \"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname\",",
+                                "               \"claimName\": \"lastname\",",
+                                "               \"list\": false,",
+                                "               \"encrypt\": false",
+                                "           },",
+                                "           {",
+                                "               \"attributeName\": \"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname\",",
+                                "               \"claimName\": \"firstname\",",
+                                "               \"list\": false,",
+                                "               \"encrypt\": false",
+                                "           },",
+                                "           {",
+                                "               \"attributeName\": \"http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name\",",
+                                "               \"claimName\": \"username\",",
+                                "               \"list\": false,",
+                                "               \"encrypt\": false",
+                                "           }",
+                                "       ],",
+                                "       \"redirectUrl\": \"https://login.microsoftonline.com/899559e3-e33e-4d06-9dc9-dd8845ad727e/saml2\",",
+                                "       \"forceAuthn\": false,",
+                                "       \"audience\": \"NCAppgateGlobalAdmin-Identifier\",",
+                                "       \"issuer\": \"https://sts.windows.net/899559e3-e33e-4d06-9dc9-dd8845ad727e/\",",
+                                "       \"providerCertificate\": \"-----BEGIN CERTIFICATE-----\\nMIIC8DCCAdigAwIBAgIQTcMe/2VUIqpBnMPhVhYC8DANBgkqhkiG9w0BAQsFADA0\\nMTIwMAYDVQQDEylNaWNyb3NvZnQgQXp1cmUgRmVkZXJhdGVkIFNTTyBDZXJ0aWZp\\nY2F0ZTAeFw0yMzExMTMxOTQ1MjRaFw0yNjExMTMxOTQ1MjVaMDQxMjAwBgNVBAMT\\nKU1pY3Jvc29mdCBBenVyZSBGZWRlcmF0ZWQgU1NPIENlcnRpZmljYXRlMIIBIjAN\\nBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxR1i84yPqNDL4jEysuKfkNBv/c3E\\nDGkFv2B81gYyh89UTzvG4FEz9Jsfr1q1XsN9vzZNvWz82f/R3ZUPTtEpUbhBRzFl\\nnaWelX2C9d4wggSkwgzlqpC7EKbzatjEdaXRC4ns+JWJyceEEr9ZzeZwW+GJWeJp\\nBMG1056NgpkC4wJDe94rMJ4V0dJ9T4rbeN3gQNzP7tKexIgBDWwO8NLi0xr+YphO\\n4dyI3jM/pc6X/cvo7u8cdtuuFS6vR3QJXJptbukjfP8CWRCi6wzgT/HqT4iYoDLH\\nWTYtuZyWYL9/AalRiTqBiwSVYFLGf9Y12RuLSYMLM2rDVt0brPt6C0cnbQIDAQAB\\nMA0GCSqGSIb3DQEBCwUAA4IBAQBqYtXo6cvWjrzdI9QrHIcpRRfXIVEzV7Q5lbUP\\n01zqLpxM34MlBGKYn+VkUbAqdtCxcmL5ifWYylb2rYwdMfSzbbj5gC2OnSyXDkSv\\nFxXzWXvEkWPyKJyaDRzjejQUrY60xEm/OKcCGhH25IxaJVVxFivHEMFJD0TOZm+d\\nFwsKdcALQahfW6XQqawmAizM4b+5gctHiL8cMEVH3Qht/R9hGm1kE37XPVqezcgE\\ndaS99pd+ovDK4FmHXrFGT41ilgwyJv+eE0C7qrywZHH+k/FtkdyCaHnPGq8UTHir\\nsvFjf+7RrqM98+FI3AMiI1BrKghzI/5pwZwxNGOgvJRzEO/e\\n-----END CERTIFICATE-----\"",
+                                "   }'",
+                                "",
+                                "   fullrole=$(curl --insecure --location --request POST \"https://$publicHostname:8443/admin/administrative-roles\" \\",
+                                "   --header \"Content-Type: application/json\" \\",
+                                "   --header \"Accept: application/vnd.appgate.peer-v19+json\" \\",
+                                "   --header \"Authorization: Bearer $token\" \\",
+                                "   --data '{",
+                                "       \"name\": \"CustomerName Full Administration Template\",",
+                                "       \"notes\": \"CustomerName Administrative Role that has full access for US only.\",",
+                                "       \"tags\": [",
+                                "           \"customername\"",
+                                "       ],",
+                                "       \"privileges\": [",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"IpPool\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\",",
+                                "                       \"default\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"OtpSeed\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"Policy\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"RegisteredDevice\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"RingfenceRule\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"SessionInfo\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"Site\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"TokenRecord\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"TrustedCertificate\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"UserClaimScript\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"UserLicense\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"Create\",",
+                                "               \"target\": \"All\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": []",
+                                "               },",
+                                "               \"defaultTags\": [",
+                                "                   \"customername\"",
+                                "               ]",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"View\",",
+                                "               \"target\": \"AdminMessage\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": []",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"AllocatedIp\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"Appliance\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customernamefulladmin\",",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"ApplianceCustomization\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"Blacklist\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"ClientProfile\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"Condition\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"CriteriaScript\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"DeviceClaimScript\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"Entitlement\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"EntitlementScript\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"FailedAuthentication\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"Fido2Device\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"All\",",
+                                "               \"target\": \"IdentityProvider\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           }",
+                                "       ]",
+                                "   }')",
+                                "",
+                                "   fullroleid=$(echo $fullrole | jq -r '.id')",
+                                "",
+                                "   # full admin policy",
+                                "   curl --insecure --location --request POST \"https://$publicHostname:8443/admin/policies\" \\",
+                                "   --header \"Content-Type: application/json\" \\",
+                                "   --header \"Accept: application/vnd.appgate.peer-v19+json\" \\",
+                                "   --header \"Authorization: Bearer $token\" \\",
+                                "   --data '{",
+                                "       \"name\": \"CustomerName Full Administration\",",
+                                "       \"notes\": \"CustomerName Full Administration Policy\",",
+                                "       \"tags\": [",
+                                "           \"customername\"",
+                                "       ],",
+                                "       \"expression\": \"//Generated by criteria builder, Operator: and\\nvar result = false;\\nif/*identity-provider*/(claims.user.ag.identityProviderId === \\\"ff265e89-04ea-485b-a3d1-2fd090c7d696\\\")/*end identity-provider*/ { result = true; } else { return false; }\\nif/*claims.user.cg_alku*/(claims.user.cg_alku && claims.user.cg_alku.indexOf(\\\"Appgate-MultiTenant-Admins-CompliantAccess\\\") >= 0)/*end claims.user.cg_alku*/ { result = true; } else { return false; }\\nreturn result;\",",
+                                "       \"type\": \"Admin\",",
+                                "       \"administrativeRoles\": [",
+                                "           \"$fullroleid\"",
+                                "       ]",
+                                "   }'",
+                                "",
+                                "   # view admin role",
+                                "   viewrole=$(curl --insecure --location --request POST \"https://$publicHostname:8443/admin/administrative-roles\" \\",
+                                "   --header \"Content-Type: application/json\" \\",
+                                "   --header \"Accept: application/vnd.appgate.peer-v19+json\" \\",
+                                "   --header \"Authorization: Bearer $token\" \\",
+                                "   --data '{",
+                                "       \"name\": \"CustomerName View Administration Template\",",
+                                "       \"notes\": \"\",",
+                                "       \"tags\": [",
+                                "           \"customername\"",
+                                "       ],",
+                                "       \"privileges\": [",
+                                "           {",
+                                "               \"type\": \"Export\",",
+                                "               \"target\": \"ClientProfile\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"View\",",
+                                "               \"target\": \"Policy\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"View\",",
+                                "               \"target\": \"AdminMessage\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": []",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"Delete\",",
+                                "               \"target\": \"Fido2Device\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"Delete\",",
+                                "               \"target\": \"OtpSeed\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"CheckStatus\",",
+                                "               \"target\": \"Appliance\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"Reboot\",",
+                                "               \"target\": \"Appliance\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           },",
+                                "           {",
+                                "               \"type\": \"View\",",
+                                "               \"target\": \"All\",",
+                                "               \"scope\": {",
+                                "                   \"all\": false,",
+                                "                   \"ids\": [],",
+                                "                   \"tags\": [",
+                                "                       \"customername\"",
+                                "                   ]",
+                                "               }",
+                                "           }",
+                                "       ]",
+                                "   }')",
+                                "",
+                                "   viewroleid=$(echo $viewrole | jq -r '.id')",
+                                "",
+                                "   # view admin policy",
+                                "   curl --insecure --location --request POST \"https://$publicHostname:8443/admin/policies\" \\",
+                                "   --header \"Content-Type: application/json\" \\",
+                                "   --header \"Accept: application/vnd.appgate.peer-v19+json\" \\",
+                                "   --header \"Authorization: Bearer $token\" \\",
+                                "   --data '{",
+                                "       \"name\": \"CustomerName View Administration\",",
+                                "       \"notes\": \"CustomerName View Administration Policy\",",
+                                "       \"tags\": [",
+                                "           \"customername\"",
+                                "       ],",
+                                "       \"expression\": \"//Generated by criteria builder, Operator: and\\nvar result = false;\\nif/*identity-provider*/(claims.user.ag.identityProviderId === \\\"ff265e89-04ea-485b-a3d1-2fd090c7d696\\\")/*end identity-provider*/ { result = true; } else { return false; }\\nif/*claims.user.cg_alku*/(claims.user.cg_alku && claims.user.cg_alku.indexOf(\\\"Appgate-MultiTenant-ViewAdmins-CompliantAccess\\\") >= 0)/*end claims.user.cg_alku*/ { result = true; } else { return false; }\\nreturn result;\",",
+                                "       \"type\": \"Admin\",",
+                                "       \"administrativeRoles\": [",
+                                "           \"$viewroleid\"",
+                                "       ]",
+                                "   }'",
+                                "",
+                                "   # remove the cronjob",
+                                "   sudo crontab -l > mycron",
+                                "   grep -v post-install.sh mycron > mycron.new",
+                                "   sudo crontab mycron.new",
+                                "   rm mycron",
+                                "   rm mycron.new",
+                                "fi",
+                                "E0F",
+                                "",
+                                "chmod 700 /home/cz/post-install.sh",
+                                "# add post-install.sh to root crontab",
+                                "crontab -l > mycron",
+                                "echo \"* * * * * /home/cz/post-install.sh\" >> mycron",
+                                "# install new cron file",
+                                "crontab mycron",
+                                "rm mycron"
+                            ]
+                        ]
+                    }
+                },             
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "DeleteOnTermination": "true",
+                            "VolumeSize": "100"
+                        }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+        "EcsSecurityGroupUdpSpaEnabled": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Condition": "UdpTcpSpaIsEnabled",
+            "Properties": {
+                "GroupDescription": "Enable access to port 8443, HTTPS on port 443, and SSH on port 22",
+                "VpcId": {
+                    "Ref": "VpcId"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": {
+                            "Ref": "SourceLocationSSH"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "443",
+                        "ToPort": "443",
+                        "CidrIp": {
+                            "Ref": "SourceLocation443"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "8443",
+                        "ToPort": "8443",
+                        "CidrIp": {
+                            "Ref": "SourceLocation8443"
+                        }
+                    },
+                    {
+                        "IpProtocol": "udp",
+                        "FromPort": "53",
+                        "ToPort": "53",
+                        "CidrIp": {
+                            "Ref": "SourceLocation443"
+                        }
+                    },
+                    {
+                        "IpProtocol": "udp",
+                        "FromPort": "443",
+                        "ToPort": "443",
+                        "CidrIp": {
+                            "Ref": "SourceLocation443"
+                        }
+                    }
+                ]
+            }
+        },
+        "ApplianceUdpSpaDisabled": {
+            "Type": "AWS::EC2::Instance",
+            "Condition": "UdpTcpSpaIsDisabled",
+            "Properties": {
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSRegionToAMI",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        "AMIID"
+                    ]
+                },
+                "InstanceType": {
+                    "Fn::Select": [
+                        "0",
+                        {
+                            "Fn::Split": [
+                                " ",
+                                {
+                                    "Ref": "InstanceType"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "SubnetId": {
+                    "Ref": "SubnetID"
+                },
+                "SecurityGroupIds": [
+                    {
+                        "Ref": "EcsSecurityGroupUdpSpaDisabled"
+                    }
+                ],
+                "IamInstanceProfile": {
+                    "Ref": "IAMProfile"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Ref": "UserData"
+                    }
+                },
+                "BlockDeviceMappings": [
+                    {
+                        "DeviceName": "/dev/sda1",
+                        "Ebs": {
+                            "VolumeType": "gp2",
+                            "DeleteOnTermination": "true",
+                            "VolumeSize": "100"
+                        }
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    }
+                ]
+            }
+        },
+        "EcsSecurityGroupUdpSpaDisabled": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Condition": "UdpTcpSpaIsDisabled",
+            "Properties": {
+                "GroupDescription": "Enable access to port 8443, HTTPS on port 443, and SSH on port 22",
+                "VpcId": {
+                    "Ref": "VpcId"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": {
+                            "Ref": "SourceLocationSSH"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "443",
+                        "ToPort": "443",
+                        "CidrIp": {
+                            "Ref": "SourceLocation443"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "8443",
+                        "ToPort": "8443",
+                        "CidrIp": {
+                            "Ref": "SourceLocation8443"
+                        }
+                    }
+                ]
+            }
+        },
+        "ReadOnlyEc2IAMRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            },
+                            "Action": [
+                                "sts:AssumeRole"
+                            ]
+                        }
+                    ]
+                },
+                "Path": "/"
+            }
+        },
+        "DescribeVpcPolicy": {
+            "Type": "AWS::IAM::Policy",
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "1dc982f2-8463-4b7c-be2a-1d6e0fbcab4b"
+                }
+            },
+            "Properties": {
+                "PolicyName": "CustomEC2ReadOnlyAccess",
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Effect": "Allow",
+                            "Action": "ec2:Describe*",
+                            "Resource": "*"
+                        }
+                    ]
+                },
+                "Roles": [
+                    {
+                        "Ref": "ReadOnlyEc2IAMRole"
+                    }
+                ]
+            }
+        },
+        "IAMProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Roles": [
+                    {
+                        "Ref": "ReadOnlyEc2IAMRole"
+                    }
+                ]
+            }
+        },
+        "ElasticIp": {
+            "Type": "AWS::EC2::EIP",
+            "Condition": "CreateElasticIP",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "EIPAssociationUdpSpaEnabled": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Condition": "AttachElasticIpUdpSpaEnabled",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "ElasticIp",
+                        "AllocationId"
+                    ]
+                },
+                "InstanceId": {
+                    "Ref": "ApplianceUdpSpaEnabled"
+                }
+            }
+        },
+        "EIPAssociationUdpSpaDisabled": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Condition": "AttachElasticIpUdpSpaDisabled",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "ElasticIp",
+                        "AllocationId"
+                    ]
+                },
+                "InstanceId": {
+                    "Ref": "ApplianceUdpSpaDisabled"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "AdminPassword": {
+            "Type": "String"
+        },
+        "CustomerName": {
+            "Type": "String"
+        },
+        "KeyName": {
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "Description": "Name of an existing EC2 key pair for SSH access to this EC2 instance on port 22"
+        },
+        "VpcId": {
+            "Type": "AWS::EC2::VPC::Id",
+            "Description": "Select a VPC containing the instances to which Appgate SDP will control access"
+        },
+        "SubnetID": {
+            "Type": "AWS::EC2::Subnet::Id",
+            "Description": "Choose a subnet within the selected VPC"
+        },
+        "SourceLocationSSH": {
+            "Type": "String",
+            "Description": "The IP address range that can access SSH on port 22. SSH access should be limited to admin networks and should only be used during the initial setup, after which access to port 22 should be restricted. Allowing access from the internet is NOT recommended!",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x"
+        },
+        "SourceLocation443": {
+            "Type": "String",
+            "Description": "The IP address range that can access port 443, which is used for Client connections and appliance-to-appliance traffic. Port 443 should be open to all IP addresses from which your users will attempt to access your protected resources (i.e., it can be open to the Internet)",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x"
+        },
+        "SourceLocation8443": {
+            "Type": "String",
+            "Description": "The IP address range that can access port 8443, which is used to access the Admin UI and for API calls. Access should be limited to admin networks and the LogServer",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x"
+        },
+        "UdpTcpSpaEnabled": {
+            "Description": "Choose a protocol for Single Packet Authorization (SPA). The default is TCP. UDP-TCP offers significant benefits over TCP in terms of Denial of Service (DoS) attack hardening. If UDP-TCP is chosen, then additional security group rules for UDP port 53 and UDP port 443 are created.",
+            "Default": "TCP SPA",
+            "Type": "String",
+            "AllowedValues": [
+                "UDP-TCP SPA",
+                "TCP SPA"
+            ]
+        },
+        "UserData": {
+            "Type": "String",
+            "Description": "Leave this blank if this is the first Controller. Otherwise, paste the seed configuration exported from another Controller"
+        },
+        "InstanceType": {
+            "Description": "EC2 instance type",
+            "Type": "String",
+            "Default": "c5.2xlarge",
+            "AllowedValues": [
+                "c4.xlarge",
+                "c4.2xlarge",
+                "c4.4xlarge",
+                "c5.large",
+                "c5.xlarge",
+                "c5.2xlarge",
+                "c5.4xlarge",
+                "c5n.large",
+                "c5n.xlarge",
+                "c5n.2xlarge",
+                "c5n.4xlarge",
+                "c6i.large",
+                "c6i.xlarge",
+                "c6in.2xlarge",
+                "c6in.4xlarge",
+                "m4.large",
+                "m4.xlarge",
+                "m4.2xlarge",
+                "m4.4xlarge",
+                "m5.large",
+                "m5.xlarge",
+                "m5.2xlarge",
+                "m5.4xlarge",
+                "m5n.large",
+                "m5n.xlarge",
+                "m5n.2xlarge",
+                "m5n.4xlarge",
+                "m6i.xlarge",
+                "r4.large",
+                "r4.xlarge",
+                "r6i.xlarge",
+                "r6i.2xlarge",
+                "r6i.4xlarge",
+                "r6i.8xlarge",
+                "r6i.12xlarge",
+                "r6in.xlarge",
+                "r6in.2xlarge",
+                "r6in.4xlarge",
+                "r6in.8xlarge",
+                "r6in.12xlarge",
+                "t2.small (Testing / Not for Production Use)",
+                "t2.medium",
+                "t2.large",
+                "t3.small (Testing / Not for Production Use)",
+                "t3.medium",
+                "t3.large",
+                "t3.xlarge",
+                "t3.2xlarge",
+                "t3a.medium"
+            ],
+            "ConstraintDescription": "Please choose a valid EC2 instance type"
+        },
+        "AllocateElasticIP": {
+            "Description": "Allocate an Elastic IP address to the instance",
+            "Default": "Yes",
+            "Type": "String",
+            "AllowedValues": [
+                "Yes",
+                "No"
+            ]
+        }
+    },
+    "Conditions": {
+        "CreateElasticIP": {
+            "Fn::Equals": [
+                {
+                    "Ref": "AllocateElasticIP"
+                },
+                "Yes"
+            ]
+        },
+        "UdpTcpSpaIsEnabled": {
+            "Fn::Equals": [
+                {
+                    "Ref": "UdpTcpSpaEnabled"
+                },
+                "UDP-TCP SPA"
+            ]
+        },
+        "UdpTcpSpaIsDisabled": {
+            "Fn::Equals": [
+                {
+                    "Ref": "UdpTcpSpaEnabled"
+                },
+                "TCP SPA"
+            ]
+        },
+        "AttachElasticIpUdpSpaEnabled": {
+            "Fn::And": [
+                {
+                    "Condition": "CreateElasticIP"
+                },
+                {
+                    "Condition": "UdpTcpSpaIsEnabled"
+                }
+            ]
+        },
+        "AttachElasticIpUdpSpaDisabled": {
+            "Fn::And": [
+                {
+                    "Condition": "CreateElasticIP"
+                },
+                {
+                    "Condition": "UdpTcpSpaIsDisabled"
+                }
+            ]
+        }
+    }
+}

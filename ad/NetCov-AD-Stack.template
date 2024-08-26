@@ -274,9 +274,9 @@
                                             {"Ref": "DomainNetBIOSName"},
                                             "\\",
                                             {"Ref": "DomainAdminUserName"},
-                                            "', (ConvertTo-SecureString -String ",
+                                            "', (ConvertTo-SecureString -String '",
                                             {"Ref": "DomainAdminPassword"},
-                                            " -AsPlainText -Force))) -NewName ",
+                                            "' -AsPlainText -Force))) -NewName ",
                                             {"Ref": "Server1Name"},
                                             " -Force"
                                         ]
@@ -417,9 +417,9 @@
                                             {"Ref": "DomainNetBIOSName"},
                                             "\\",
                                             {"Ref": "DomainAdminUserName"},
-                                            "', (ConvertTo-SecureString -String ",
+                                            "', (ConvertTo-SecureString -String '",
                                             {"Ref": "DomainAdminPassword"},
-                                            " -AsPlainText -Force))) -NewName ",
+                                            "' -AsPlainText -Force))) -NewName ",
                                             {"Ref": "Server2Name"},
                                             " -Force"
                                         ]

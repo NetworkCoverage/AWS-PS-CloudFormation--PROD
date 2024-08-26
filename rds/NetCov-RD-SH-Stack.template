@@ -226,9 +226,9 @@
                                             {"Ref": "DomainDNSName"},
                                             " -Credential (New-Object -TypeName pscredential -ArgumentList ('",
                                             {"Ref": "DomainNetBIOSName"}, "\\", {"Ref": "DomainAdminUserName"},
-                                            "', (ConvertTo-SecureString -String ",
+                                            "', (ConvertTo-SecureString -String '",
                                             {"Ref": "DomainAdminPassword"},
-                                            " -AsPlainText -Force))) -NewName ",
+                                            "' -AsPlainText -Force))) -NewName ",
                                             {"Ref": "VmName"}, " -Force"
                                         ]
                                     ]

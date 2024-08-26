@@ -124,7 +124,7 @@
             "Type": "AWS::EC2::KeyPair::KeyName"
         },
         "LatestAmiId": {
-            "Default": "/aws/service/ami-windows-latest/Windows_Server-2019-English-Full-Base",
+            "Default": "/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base",
             "Description": "System Manager parameter value for latest Windows Server AMI",
             "Type": "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
         },
@@ -231,11 +231,7 @@
             "Metadata" : {
                 "AWS::CloudFormation::Init" : {
                     "configSets": {
-                        "config": [
-                            "setup",
-                            "deployrds",
-                            "finalize"
-                        ]
+                        "config": ["setup","deployrds","finalize"]
                     },
                     "setup": {
                         "files": {
@@ -293,9 +289,9 @@
                                             {"Ref": "DomainNetBIOSName"},
                                             "\\",
                                             {"Ref": "DomainAdminUserName"},
-                                            "', (ConvertTo-SecureString -String ",
+                                            "', (ConvertTo-SecureString -String '",
                                             {"Ref": "DomainAdminPassword"},
-                                            " -AsPlainText -Force))) -NewName ",
+                                            "' -AsPlainText -Force))) -NewName ",
                                             {"Ref": "BrokerServerName"},
                                             " -Force"
                                         ]
